@@ -13,6 +13,7 @@ fine-tuning and whether it outperforms Logit Lens on target-specific readout.
    `bash scripts/bootstrap_runpod.sh`.
 4. Run `python scripts/verify_artifacts.py` before downloading model weights.
 5. Start with `notebooks/00_environment_smoke_test.ipynb`.
+6. Continue through the Gold/Blue notebook sequence in `notebooks/README.md`.
 
 ## Development setup
 
@@ -33,6 +34,8 @@ scripts in `tmux`, not depend only on an interactive MCP call.
 - RunPod bootstrap, Jupyter, SSH-tunnel, and remote health-check scripts;
 - a project-local Jupyter MCP configuration;
 - an environment smoke-test notebook;
+- a four-notebook Gold/Blue behavior, J-Lens/Logit-Lens sweep and analysis
+  pipeline with resumable artifacts;
 - the curated Neel context folder and research papers supplied for this project;
 - research log and evidence-ledger templates.
 
@@ -44,4 +47,5 @@ scripts in `tmux`, not depend only on an interactive MCP call.
 - generated large outputs.
 
 See `references/README.md` for reference handling and
-`docs/ARTIFACT_CHECKLIST.md` for runtime artifacts.
+`docs/ARTIFACT_CHECKLIST.md` for runtime artifacts. The frozen two-secret
+protocol is in `docs/GOLD_BLUE_PROTOCOL.md`.

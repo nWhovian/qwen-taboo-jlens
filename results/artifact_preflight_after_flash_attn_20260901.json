@@ -1,0 +1,77 @@
+{
+  "timestamp_utc": "2026-09-01T12:28:17.922892+00:00",
+  "config": "configs/smoke_test.json",
+  "checks": {
+    "base_model": {
+      "repo_id": "Qwen/Qwen3.6-27B",
+      "requested_revision": "main",
+      "resolved_sha": "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9",
+      "architecture": [
+        "Qwen3_5ForConditionalGeneration"
+      ],
+      "transformers_version": "4.57.1",
+      "hidden_size": 5120,
+      "num_hidden_layers": 64,
+      "hidden_size_matches": true,
+      "num_layers_matches": true
+    },
+    "adapter": {
+      "repo_id": "EvilScript/Qwen3_6-27B-taboo-gold",
+      "requested_revision": "main",
+      "resolved_sha": "ff9bb66f1c672b4735ba7f258b9d18ba3370c8a2",
+      "secret": "gold",
+      "base_model_name_or_path": "Qwen/Qwen3.6-27B",
+      "base_model_matches": true,
+      "r": 32,
+      "lora_alpha": 64,
+      "lora_dropout": 0.05,
+      "target_modules": [
+        "up_proj",
+        "gate_proj",
+        "q_proj",
+        "in_proj_qkv",
+        "k_proj",
+        "in_proj_a",
+        "in_proj_b",
+        "out_proj",
+        "down_proj",
+        "v_proj",
+        "in_proj_z",
+        "o_proj"
+      ]
+    },
+    "wrong_adapter": {
+      "repo_id": "EvilScript/Qwen3_6-27B-taboo-blue",
+      "requested_revision": "main",
+      "resolved_sha": "0e18026f6d0ec674f40c31ef82f1b079f49f1080",
+      "secret": "blue",
+      "base_model_name_or_path": "Qwen/Qwen3.6-27B",
+      "base_model_matches": true,
+      "r": 32,
+      "lora_alpha": 64,
+      "lora_dropout": 0.05,
+      "target_modules": [
+        "up_proj",
+        "gate_proj",
+        "q_proj",
+        "in_proj_qkv",
+        "k_proj",
+        "in_proj_a",
+        "in_proj_b",
+        "out_proj",
+        "down_proj",
+        "v_proj",
+        "in_proj_z",
+        "o_proj"
+      ]
+    },
+    "jlens": {
+      "repo_id": "neuronpedia/jacobian-lens",
+      "requested_revision": "91271eb5b15a43eebed7bb447618738754f1379a",
+      "resolved_sha": "91271eb5b15a43eebed7bb447618738754f1379a",
+      "filename": "qwen3.6-27b/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt",
+      "file_exists": true
+    }
+  },
+  "errors": []
+}

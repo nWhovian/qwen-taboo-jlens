@@ -1,0 +1,14 @@
+{
+  "output": "data/prompts/taboo_published.jsonl",
+  "records": 270,
+  "counts": {
+    "direct_test": 100,
+    "direct_val": 20,
+    "standard_test": 100,
+    "standard_val": 50
+  },
+  "source_repository": "https://github.com/federicotorrielli/probabilistic_activation_oracles",
+  "parent_commit": "d1a8eb25e6ec6d171dbd315b929a3728bc0fa7cf",
+  "submodule_commit": "c8940e59f141718d37ef54cc7f5f8d04879a89bd",
+  "sha256": "e96b4cf847af6b03fa094ddab567f51983c4224a794406b0040753f3865d5e63"
+}

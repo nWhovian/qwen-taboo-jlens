@@ -13,6 +13,10 @@ from typing import Any
 PACKAGES = (
     "accelerate",
     "datasets",
+    "flash-attn",
+    "flash-attn-4",
+    "flash-linear-attention",
+    "causal-conv1d",
     "huggingface-hub",
     "jupyterlab",
     "peft",
@@ -85,4 +89,3 @@ def save_environment(path: str | Path = "results/environment_report.json") -> di
 
 if __name__ == "__main__":
     print(json.dumps(save_environment(), indent=2))
-

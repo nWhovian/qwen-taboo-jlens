@@ -1,0 +1,29 @@
+{
+  "timestamp_utc": "2026-09-01T09:26:36.894963+00:00",
+  "python": "3.11.13 (main, Jun  4 2025, 08:57:30) [GCC 13.3.0]",
+  "platform": "Linux-6.8.0-100-generic-x86_64-with-glibc2.39",
+  "packages": {
+    "accelerate": "1.14.0",
+    "datasets": "5.0.1",
+    "huggingface-hub": "1.29.0",
+    "jupyterlab": "4.6.3",
+    "peft": "0.20.0",
+    "safetensors": "0.8.0",
+    "torch": "2.13.0",
+    "transformers": "5.16.1"
+  },
+  "nvidia_smi": "Tue Sep  1 09:26:36 2026       \n+-----------------------------------------------------------------------------------------+\n| NVIDIA-SMI 580.126.09             Driver Version: 580.126.09     CUDA Version: 13.0     |\n+-----------------------------------------+------------------------+----------------------+\n| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n|                                         |                        |               MIG M. |\n|=========================================+========================+======================|\n|   0  NVIDIA H100 80GB HBM3          On  |   00000000:19:00.0 Off |                    0 |\n| N/A   36C    P0             72W /  700W |       0MiB /  81559MiB |      0%      Default |\n|                                         |                        |             Disabled |\n+-----------------------------------------+------------------------+----------------------+\n\n+-----------------------------------------------------------------------------------------+\n| Processes:                                                                              |\n|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n|        ID   ID                                                               Usage      |\n|=========================================================================================|\n|  No running processes found                                                             |\n+-----------------------------------------------------------------------------------------+\n",
+  "torch_runtime": {
+    "version": "2.13.0+cu130",
+    "cuda_available": true,
+    "cuda_version": "13.0",
+    "device_count": 1,
+    "devices": [
+      {
+        "index": 0,
+        "name": "NVIDIA H100 80GB HBM3",
+        "total_memory_bytes": 85017493504
+      }
+    ]
+  }
+}
