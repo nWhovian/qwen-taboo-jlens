@@ -18,10 +18,7 @@ source .venv/bin/activate
 uv pip install --upgrade \
   "transformers>=4.57.1" accelerate peft safetensors huggingface_hub \
   datasets pandas pyarrow scikit-learn matplotlib seaborn \
-  jupyterlab jupyter-collaboration jupyter-mcp-tools ipykernel
-
-python -m ipykernel install --user --name qwen-taboo-jlens \
-  --display-name "Qwen Taboo J-Lens"
+  ipython
 
 mkdir -p vendor results figures logs artifacts/activations \
   artifacts/lens_outputs artifacts/checkpoints data/raw_outputs
@@ -30,12 +27,6 @@ if [[ ! -d vendor/jacobian-lens/.git ]]; then
   git clone https://github.com/anthropics/jacobian-lens.git vendor/jacobian-lens
 fi
 uv pip install -e vendor/jacobian-lens
-
-if [[ ! -d vendor/probabilistic_activation_oracles/.git ]]; then
-  git clone --recurse-submodules \
-    https://github.com/federicotorrielli/probabilistic_activation_oracles.git \
-    vendor/probabilistic_activation_oracles
-fi
 
 python - <<'PY'
 import torch
@@ -52,6 +43,4 @@ PY
 python -m src.environment_report >/dev/null
 
 echo "Bootstrap complete. Review results/environment_report.json."
-echo "Next: bash scripts/fetch_public_references.sh"
-echo "Then: python scripts/verify_artifacts.py"
-
+echo "Next: python scripts/verify_artifacts.py"

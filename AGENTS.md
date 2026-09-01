@@ -35,10 +35,9 @@ These are research questions, not premises:
   condition because it can change activations.
 - Do not use Flash Attention 4. Begin with `flash_attention_2`; if unavailable,
   record and test `sdpa` or `eager` explicitly.
-- Never restart the persistent Jupyter kernel without asking.
-- Load the model and shared data once in dedicated setup cells or modules.
+- Load the model and shared data once in a dedicated setup process or module.
 - Run long jobs as scripts with logs and resumable run IDs, not solely inside a
-  notebook cell.
+  transient shell process.
 - Save complete rendered prompts, token IDs, generations, layers, positions,
   top-k outputs, target scores/ranks, configuration, timestamps, and exact
   artifact revisions.
@@ -56,13 +55,12 @@ These are research questions, not premises:
 ## Mandatory order
 
 1. Run `scripts/verify_artifacts.py`; do not download 27B weights yet.
-2. Connect to `notebooks/00_environment_smoke_test.ipynb` through Jupyter MCP.
-3. Confirm CUDA and that model/adapter/lens metadata match.
-4. Download only the base model, one adapter, and the `_n1000` J-Lens.
-5. Verify one deterministic base generation and one published Taboo example.
-6. Apply J-Lens and Logit Lens to one base-model example at explicit positions.
-7. Run base/correct-adapter/wrong-adapter on a handful of examples.
-8. Inspect raw outputs before scaling.
+2. Confirm CUDA and that model/adapter/lens metadata match.
+3. Download only the base model, one adapter, and the `_n1000` J-Lens.
+4. Verify one deterministic base generation and one published Taboo example.
+5. Apply J-Lens and Logit Lens to one base-model example at explicit positions.
+6. Run base/correct-adapter/wrong-adapter on a handful of examples.
+7. Inspect raw outputs before scaling.
 
 ## Stop and ask before continuing when
 
@@ -72,6 +70,4 @@ These are research questions, not premises:
 - model loading requires CPU offload or quantization for the primary condition;
 - the only remaining path requires fitting an Oracle Lens, NLA, SAE, or large
   model from scratch;
-- Jupyter MCP setup consumes more than 30–45 focused minutes;
 - the expected work exceeds the remaining 20-hour research budget.
-

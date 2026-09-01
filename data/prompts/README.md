@@ -2,9 +2,11 @@
 
 Do not invent the first evaluation prompts.
 
-After `vendor/probabilistic_activation_oracles` is cloned:
+Use the public Qwen3.6 Taboo source repository without installing its runtime:
+<https://github.com/federicotorrielli/probabilistic_activation_oracles>.
 
-1. locate the Qwen3.6-27B preset and exact Taboo prompt source;
+1. inspect or shallow-clone it temporarily and locate the Qwen3.6-27B preset
+   and exact Taboo prompt source;
 2. record file paths and commit in `research_log.md`;
 3. extract a small published smoke subset to `taboo_published.jsonl`;
 4. preserve the original train/evaluation split if the source provides one;
@@ -16,3 +18,5 @@ After `vendor/probabilistic_activation_oracles` is cloned:
 Any custom prompts must go in a separate file and be labelled `custom`, never
 mixed silently with published prompts.
 
+Do not copy the full source repository into this project or install its pinned
+Python/Torch/CUDA environment.

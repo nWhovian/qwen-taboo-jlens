@@ -1,11 +1,13 @@
-# Neel context files
+# Neel context manifest
 
-Files in this directory are intentionally downloaded manually and ignored by
-Git. Follow `references/README.md`.
+Download every file from the shared Drive folder into this directory while
+preserving filenames and extensions:
 
-Expected names:
+<https://drive.google.com/drive/u/0/folders/1GfrgKJwndk-twnJ8K7Ba-TE9i_8wBWAU>
 
-- `default-context.txt` (or the actual exported extension);
-- `activations-context.txt` (or the actual exported extension);
-- optional `neel-mats-technical-advice.pdf`.
+After copying the files, list them below with short source-faithful topic labels.
+Do not paste their full contents into this manifest or `AGENTS.md`.
 
+## Files
+
+- Pending manual download.

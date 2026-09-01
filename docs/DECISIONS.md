@@ -7,7 +7,7 @@
   LoRA.
 - First adapter candidate: `gold`; wrong-adapter candidate: `blue`.
 - Baseline: vanilla Logit Lens on identical layers and positions.
-- Persistent execution: JupyterLab through `jupyter-mcp-server`.
+- Persistent execution: scripts or IPython inside `tmux` on RunPod.
 - Primary precision: BF16, no quantization.
 - Primary hardware: one 80 GB GPU.
 - Oracle Lens/Activation Oracle is related work, not a first-stage dependency.
@@ -23,4 +23,3 @@
   check, before looking at Taboo target results.
 
 Append changes with date, evidence, and reason. Do not rewrite earlier entries.
-
