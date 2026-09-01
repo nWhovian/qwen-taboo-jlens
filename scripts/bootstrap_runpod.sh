@@ -18,7 +18,11 @@ source .venv/bin/activate
 uv pip install --upgrade \
   "transformers>=4.57.1" accelerate peft safetensors huggingface_hub \
   datasets pandas pyarrow scikit-learn matplotlib seaborn \
-  ipython
+  ipython ipykernel jupyterlab jupyter-collaboration jupyter-mcp-tools \
+  pycrdt "jupyter-mcp-server==2.1.2"
+
+python -m ipykernel install --user --name qwen-taboo-jlens \
+  --display-name "Qwen Taboo J-Lens"
 
 mkdir -p vendor results figures logs artifacts/activations \
   artifacts/lens_outputs artifacts/checkpoints data/raw_outputs
@@ -44,3 +48,4 @@ python -m src.environment_report >/dev/null
 
 echo "Bootstrap complete. Review results/environment_report.json."
 echo "Next: python scripts/verify_artifacts.py"
+echo "Then: tmux new -s jlens-jupyter 'bash scripts/start_jupyter.sh'"

@@ -2,6 +2,8 @@
 .env
 .env.local
 .venv/
+.jupyter/
+.ipynb_checkpoints/
 __pycache__/
 *.py[cod]
 
@@ -17,9 +19,4 @@ logs/**
 results/run_*/
 figures/run_*/
 
-# Public references downloaded by scripts/fetch_public_references.sh
-references/papers/*.pdf
-references/papers/*.html
-
-# Files manually copied into references/neel-context are intentionally tracked.
-# Keep the GitHub repository private unless redistribution rights are confirmed.
+# Curated reference files are intentionally tracked in this private repository.

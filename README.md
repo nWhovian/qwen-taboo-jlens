@@ -7,28 +7,41 @@ fine-tuning and whether it outperforms Logit Lens on target-specific readout.
 ## Start here
 
 1. Read `docs/PROJECT_BRIEF.md` and `docs/EXPERIMENT_PLAN.md`.
-2. Follow `docs/RUNPOD_SETUP.md` on an H100 80 GB or A100 80 GB pod.
-3. Add Neel's reference folder as described in `references/README.md`.
-4. Run `scripts/bootstrap_runpod.sh`.
-5. Run `python scripts/verify_artifacts.py` before downloading model weights.
-6. Use Codex CLI or IPython in `tmux` on RunPod.
+2. Follow `docs/RUNPOD_SETUP.md` to connect Codex desktop and local-browser
+   Jupyter to a RunPod GPU through SSH.
+3. On RunPod, run `python3 scripts/create_env_local.py` and
+   `bash scripts/bootstrap_runpod.sh`.
+4. Run `python scripts/verify_artifacts.py` before downloading model weights.
+5. Start with `notebooks/00_environment_smoke_test.ipynb`.
 
-## What is already included
+## Development setup
+
+The repository is cloned under `/workspace` on RunPod. Codex desktop opens that
+checkout as a remote SSH project. Jupyter and its persistent kernel also run on
+RunPod; the Mac browser reaches them through a private SSH tunnel. The checked-in
+project MCP configuration lets remote Codex inspect and execute short notebook
+cells in the same Jupyter server.
+
+CLI-only work is supported but is not required. Long experiments should run as
+scripts in `tmux`, not depend only on an interactive MCP call.
+
+## Included
 
 - persistent project instructions in `AGENTS.md`;
-- the research question, controls, metrics, branches, and stop conditions;
-- an artifact preflight that checks Hugging Face metadata without downloading
-  27B weights;
-- a minimal RunPod bootstrap script and optional public-reference downloader;
-- a research log and evidence-ledger template.
+- research question, controls, metrics, branches, and stop conditions;
+- artifact preflight without downloading the 27B weights;
+- RunPod bootstrap, Jupyter, SSH-tunnel, and remote health-check scripts;
+- a project-local Jupyter MCP configuration;
+- an environment smoke-test notebook;
+- the curated Neel context folder and research papers supplied for this project;
+- research log and evidence-ledger templates.
 
-## What is deliberately not included
+## Not included in Git
 
-- model weights, LoRA weights, J-Lens weights, or activation dumps;
-- Hugging Face tokens;
-- unpublished or access-controlled documents;
-- invented Taboo prompts;
-- an assumption that the public adapter and lens are compatible.
+- model, LoRA, or J-Lens weights;
+- Hugging Face, GitHub, Jupyter, or OpenAI credentials;
+- activation dumps, checkpoints, caches, or virtual environments;
+- generated large outputs.
 
-See `references/README.md` for the exact manual downloads and
+See `references/README.md` for reference handling and
 `docs/ARTIFACT_CHECKLIST.md` for runtime artifacts.
