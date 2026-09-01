@@ -1,0 +1,37 @@
+{
+  "run_name": "qwen36_gold_smoke",
+  "seed": 7,
+  "base_model": {
+    "repo_id": "Qwen/Qwen3.6-27B",
+    "revision": "main",
+    "expected_hidden_size": 5120,
+    "expected_num_hidden_layers": 64
+  },
+  "adapter": {
+    "repo_id": "EvilScript/Qwen3_6-27B-taboo-gold",
+    "revision": "main",
+    "secret": "gold"
+  },
+  "wrong_adapter": {
+    "repo_id": "EvilScript/Qwen3_6-27B-taboo-blue",
+    "revision": "main",
+    "secret": "blue"
+  },
+  "jlens": {
+    "repo_id": "neuronpedia/jacobian-lens",
+    "revision": "91271eb5b15a43eebed7bb447618738754f1379a",
+    "filename": "qwen3.6-27b/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt"
+  },
+  "runtime": {
+    "dtype": "bfloat16",
+    "attention_implementation": "flash_attention_2",
+    "device": "cuda",
+    "do_sample": false,
+    "max_new_tokens": 128
+  },
+  "data": {
+    "published_prompts_path": "data/prompts/taboo_published.jsonl",
+    "smoke_examples": 5
+  }
+}
+

@@ -1,0 +1,26 @@
+[project]
+name = "qwen-taboo-jlens"
+version = "0.1.0"
+description = "Base-to-Taboo-LoRA transfer test for Qwen3.6-27B J-Lens"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "accelerate",
+  "datasets",
+  "huggingface-hub",
+  "ipykernel",
+  "jupyter-collaboration",
+  "jupyter-mcp-tools",
+  "jupyterlab",
+  "matplotlib",
+  "pandas",
+  "peft",
+  "pyarrow",
+  "safetensors",
+  "scikit-learn",
+  "seaborn",
+  "transformers>=4.57.1",
+]
+
+[tool.ruff]
+line-length = 100
+

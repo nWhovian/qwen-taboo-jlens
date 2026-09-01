@@ -1,0 +1,26 @@
+.DS_Store
+.env
+.env.local
+.venv/
+.ipynb_checkpoints/
+__pycache__/
+*.py[cod]
+
+# External repositories and large artifacts
+vendor/
+artifacts/activations/**
+artifacts/lens_outputs/**
+artifacts/checkpoints/**
+data/raw_outputs/**
+logs/**
+
+# Generated results. Curate small final tables manually before committing.
+results/run_*/
+figures/run_*/
+
+# Locally downloaded reference documents
+references/papers/*.pdf
+references/papers/*.html
+references/neel-context/*
+!references/neel-context/README.md
+
