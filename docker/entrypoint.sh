@@ -12,4 +12,9 @@ fi
 ssh-keygen -A
 /usr/sbin/sshd
 
+if [[ "${PREFETCH_MODELS:-1}" == "1" ]]; then
+  PREFETCH_CONFIG_PATH="${PREFETCH_CONFIG_PATH:-/opt/qwen-runtime-build/configs/gold_blue_experiment.json}" \
+    /opt/qwen-runtime-build/scripts/start_model_prefetch.sh
+fi
+
 exec "$@"

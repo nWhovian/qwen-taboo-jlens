@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
 import tomllib
 import unittest
 from pathlib import Path
@@ -44,6 +47,43 @@ class RuntimeContractTests(unittest.TestCase):
         ]:
             source = (PROJECT_ROOT / relative_path).read_text()
             self.assertIn("PROJECT_VENV", source, relative_path)
+
+    def test_prefetch_plan_uses_the_experiment_pins(self) -> None:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(PROJECT_ROOT / "scripts" / "prefetch_models.py"),
+                "--config",
+                str(PROJECT_ROOT / "configs" / "gold_blue_experiment.json"),
+                "--dry-run",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        plan = json.loads(completed.stdout)
+        self.assertEqual(
+            [item["label"] for item in plan],
+            ["base_model", "adapter_gold", "adapter_blue", "jlens"],
+        )
+        self.assertTrue(all(len(item["revision"]) == 40 for item in plan))
+        self.assertEqual(plan[-1]["kind"], "file")
+        self.assertTrue(plan[-1]["filename"].endswith("_n1000.pt"))
+
+    def test_container_starts_prefetch_without_blocking_main_command(self) -> None:
+        dockerfile = (PROJECT_ROOT / "Dockerfile").read_text()
+        entrypoint = (PROJECT_ROOT / "docker" / "entrypoint.sh").read_text()
+        launcher = (PROJECT_ROOT / "scripts" / "start_model_prefetch.sh").read_text()
+        self.assertIn("PREFETCH_MODELS=1", dockerfile)
+        self.assertIn("start_model_prefetch.sh", entrypoint)
+        self.assertIn("nohup", launcher)
+        self.assertIn("&\n", launcher)
+
+    def test_macos_jupyter_mcp_uses_stable_ssh_alias(self) -> None:
+        source = (PROJECT_ROOT / "scripts" / "start_jupyter_mcp.sh").read_text()
+        self.assertIn('RUNPOD_SSH_HOST:-runpod-jlens', source)
+        self.assertIn('RUNPOD_PROJECT_PATH:-/workspace/qwen-taboo-jlens', source)
+        self.assertIn('exec ssh -T "$SSH_HOST"', source)
 
 
 if __name__ == "__main__":

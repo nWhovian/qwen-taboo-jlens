@@ -18,7 +18,36 @@ PyTorch template and upgrade packages in place.
 The FlashAttention wheel is downloaded and installed while the image is built.
 Nothing is compiled when a Pod starts.
 
-## Build and push once
+The large Hugging Face artifacts are deliberately not baked into the image.
+At container start, a background prefetch immediately downloads the exact
+revisions from `configs/gold_blue_experiment.json` into `/workspace/hf-cache`:
+
+- `Qwen/Qwen3.6-27B`;
+- the Gold and Blue LoRA adapters;
+- only the required J-Lens `_n1000.pt` file.
+
+Jupyter and SSH start without waiting. Downloads are resumable, deduplicated by
+the Hugging Face cache, and protected by a process lock.
+
+## Test locally, then build and push once
+
+On an Apple Silicon Mac, install and start Docker Desktop first. The image is
+Linux x86_64, so the Mac build uses emulation:
+
+```bash
+docker version
+docker buildx version
+docker buildx build --platform linux/amd64 --load \
+  -t qwen-taboo-jlens:test .
+docker run --rm --platform linux/amd64 \
+  -e PREFETCH_MODELS=0 \
+  --entrypoint python \
+  qwen-taboo-jlens:test \
+  /opt/qwen-runtime-build/scripts/check_runtime.py
+```
+
+This verifies the image and packages without downloading model weights. A Mac
+cannot run the NVIDIA test; run `check_runtime.py --require-gpu` on RunPod.
 
 RunPod is x86_64, so always specify the platform. Use a versioned tag, not
 `latest`:
@@ -31,8 +60,9 @@ docker buildx build --platform linux/amd64 \
 ```
 
 If the GHCR package is private, add the matching `nWhovian` registry credential
-in RunPod before creating the Pod. The image contains packages, SSH, Jupyter and
-the Codex CLI, but no source repository, model files or credentials.
+in RunPod before creating the Pod. The image contains packages, SSH, Jupyter,
+the prefetch program and the Codex CLI, but no source repository, model files or
+credentials.
 
 ## Create the RunPod Pod
 
@@ -64,6 +94,17 @@ persists independently of the image:
 export HF_HOME=/workspace/hf-cache
 ```
 
+Watch the startup download without blocking other work:
+
+```bash
+tail -f /workspace/model-prefetch.log
+cat /workspace/model-prefetch-status.json
+```
+
+Set `PREFETCH_MODELS=0` only when automatic downloading is unwanted. Set
+`PREFETCH_MAX_PARALLEL=1` when conserving bandwidth matters more than fetching
+small artifacts alongside the base model.
+
 Then start Jupyter as described in `docs/RUNPOD_SETUP.md`.
 
 ## Docker Compose
@@ -71,7 +112,7 @@ Then start Jupyter as described in `docs/RUNPOD_SETUP.md`.
 Compose is for a Linux machine with an NVIDIA GPU and NVIDIA Container Toolkit.
 RunPod itself starts the published image directly and does not use Compose.
 
-Create `.env.local`, then:
+Create `.env.local`, then (Linux with an NVIDIA GPU only):
 
 ```bash
 python3 scripts/create_env_local.py

@@ -1,7 +1,10 @@
 # Artifact checklist
 
 Run `python scripts/verify_artifacts.py` before downloading large files. Save
-the report at `results/artifact_preflight.json`.
+the report at `results/artifact_preflight.json`. In the repository container,
+the already-verified pinned revisions are prefetched in the background from
+`configs/gold_blue_experiment.json`; use
+`/workspace/model-prefetch-status.json` to see whether each artifact is ready.
 
 ## Base model
 
@@ -56,4 +59,3 @@ the report at `results/artifact_preflight.json`.
   attention backend, dtype, seed, and generation parameters.
 - Primary attention candidate: `flash_attention_2`.
 - Do not use Flash Attention 4 for the activation comparison.
-

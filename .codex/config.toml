@@ -1,5 +1,6 @@
-# Loaded only after the project is trusted. On a remote Codex project this
-# process runs on RunPod and connects to the private Jupyter server there.
+# Loaded only after the project is trusted. On macOS the launcher reaches the
+# RunPod MCP server through the stable `runpod-jlens` SSH alias; on a remote
+# Codex project it connects to the private Jupyter server directly.
 
 [mcp_servers.jupyter]
 command = "bash"

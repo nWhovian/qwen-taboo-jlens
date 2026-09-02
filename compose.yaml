@@ -14,6 +14,8 @@ services:
       PROJECT_VENV: /opt/qwen-taboo-venv
       HF_HOME: /workspace/hf-cache
       JUPYTER_BIND_HOST: 0.0.0.0
+      PREFETCH_MODELS: "1"
+      PREFETCH_MAX_PARALLEL: "2"
     volumes:
       - .:/workspace/qwen-taboo-jlens
       - hf-cache:/workspace/hf-cache

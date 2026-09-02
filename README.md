@@ -14,17 +14,23 @@ fine-tuning and whether it outperforms Logit Lens on target-specific readout.
 4. On RunPod, run `python3 scripts/create_env_local.py` and
    `bash scripts/bootstrap_runpod.sh`; with the image this verifies the runtime
    instead of installing or compiling it.
-5. Run `python scripts/verify_artifacts.py` before downloading model weights.
+5. Run `python scripts/verify_artifacts.py` before relying on downloaded model
+   weights.
 6. Start with `notebooks/00_environment_smoke_test.ipynb`.
 7. Continue through the Gold/Blue notebook sequence in `notebooks/README.md`.
 
 ## Development setup
 
-The repository is cloned under `/workspace` on RunPod. Codex desktop opens that
-checkout as a remote SSH project. Jupyter and its persistent kernel also run on
-RunPod; the Mac browser reaches them through a private SSH tunnel. The checked-in
-project MCP configuration lets remote Codex inspect and execute short notebook
-cells in the same Jupyter server.
+Use the local checkout and its Codex task as the stable control plane. The
+current RunPod is a replaceable GPU worker reached through the SSH alias
+`runpod-jlens`. When a Pod changes, update only that alias; the Codex task and
+local checkout do not move.
+
+Jupyter and its kernel run on RunPod. The Mac browser reaches Jupyter through a
+private SSH tunnel, and the checked-in MCP launcher reaches the same server over
+SSH stdio. Opening the RunPod checkout directly as a remote Codex project remains
+possible, but it is optional and should not be the only place where project
+context lives.
 
 CLI-only work is supported but is not required. Long experiments should run as
 scripts in `tmux`, not depend only on an interactive MCP call.
@@ -33,6 +39,7 @@ scripts in `tmux`, not depend only on an interactive MCP call.
 
 - persistent project instructions in `AGENTS.md`;
 - a pinned CUDA/PyTorch/FlashAttention/J-Lens Docker image and Compose setup;
+- resumable background prefetch for the pinned model, adapters, and J-Lens file;
 - research question, controls, metrics, branches, and stop conditions;
 - artifact preflight without downloading the 27B weights;
 - RunPod bootstrap, Jupyter, SSH-tunnel, and remote health-check scripts;

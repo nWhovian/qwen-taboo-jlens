@@ -3,15 +3,20 @@
 This is the intended setup:
 
 ```text
-Codex desktop on Mac ── SSH ──> Codex + repository on RunPod
-Mac browser          ── SSH tunnel ──> Jupyter on RunPod (127.0.0.1:8889)
-remote Codex         ── stdio MCP ──> Jupyter API and the persistent kernel
+local Codex task + checkout ── SSH ──> replaceable RunPod GPU worker
+Mac browser                 ── SSH tunnel ──> Jupyter (127.0.0.1:8889)
+local Codex Jupyter MCP     ── SSH stdio ──> the same Jupyter server/kernel
 ```
 
-The model, CUDA environment, notebook kernel, and experiment files all live on
-RunPod. The browser is only a local view through an encrypted SSH tunnel. Codex
-desktop can open the RunPod checkout as a remote project, so normal development
-does not require working only in a terminal.
+Keep one main Codex task attached to the local checkout. Its conversation and
+working copy then survive Pod replacement. The GPU runtime, model cache,
+notebook kernel, and long jobs live on RunPod. The browser is only a local view
+through an encrypted SSH tunnel. Codex reaches the remote Jupyter MCP through
+the same stable SSH alias.
+
+The RunPod checkout must still be synchronized through Git before remote code
+is executed. GitHub is the source of truth for code; persistent storage under
+`/workspace` is the source of truth for caches and large outputs.
 
 The recommended deployment uses the pinned image in `docs/CONTAINER.md`. It
 already contains the compatible CUDA/PyTorch/FlashAttention/J-Lens environment,
@@ -31,6 +36,11 @@ from that image with:
 Keep the repository, Hugging Face cache, results, and checkpoints under
 `/workspace`. Do not expose Jupyter's port publicly: it binds to
 `127.0.0.1:8889` and is reached through SSH forwarding.
+
+For Pods that may be replaced frequently, prefer a RunPod Network Volume mounted
+at `/workspace`. Ordinary Pod storage survives Stop but is tied to that Pod;
+the repository can be recloned, but the 50+ GB model cache is worth carrying
+between workers.
 
 RunPod shows an SSH command similar to:
 
@@ -72,6 +82,10 @@ ssh runpod-jlens
 ```
 
 If this does not open a RunPod shell, stop here and fix SSH first.
+
+When the Pod changes, keep the alias name `runpod-jlens` and replace only
+`HostName` and `Port`. Verify `ssh runpod-jlens true`; the local Codex project,
+task, and MCP configuration stay the same.
 
 ## 3. Clone the private repository on RunPod
 
@@ -118,6 +132,27 @@ the same pinned versions and prebuilt FlashAttention wheel.
 
 Stop before downloading 27B model weights if CUDA is unavailable or
 `verify_artifacts.py` reports incompatible or unverified artifacts.
+
+With the repository image, model prefetch has already started in the background
+while you perform these checks. Inspect it at any time:
+
+```bash
+tail -f /workspace/model-prefetch.log
+cat /workspace/model-prefetch-status.json
+```
+
+If the container is stopped mid-download, the process stops but completed and
+partial cache files remain under `/workspace/hf-cache`; the next start resumes
+them. You can open Jupyter immediately, but a cell that loads the 27B model must
+wait until `base_model` is `complete` in the status file.
+
+If first-boot prefetch failed because Hugging Face authentication was not yet
+available, run `hf auth login` and restart only the downloader:
+
+```bash
+cd /workspace/qwen-taboo-jlens
+bash scripts/start_model_prefetch.sh
+```
 
 ## 5. Start persistent Jupyter on RunPod
 
@@ -168,7 +203,27 @@ LOCAL_JUPYTER_PORT=8890 bash scripts/jupyter_tunnel.sh runpod-jlens
 
 Then replace `8888` with `8890` in the displayed URL.
 
-## 7. Install Codex on RunPod
+## 7. Use the local Codex task with remote Jupyter MCP
+
+Open the local project `/Users/ana/mats/qwen-taboo-jlens` in Codex desktop and
+keep working in that task. Trust the repository so `.codex/config.toml` loads,
+then run `/mcp`.
+
+On macOS, `scripts/start_jupyter_mcp.sh` automatically starts the MCP server on
+`runpod-jlens` over SSH. On RunPod/Linux, the same script starts it locally.
+Before relying on it, the remote checkout must contain the same commit and
+Jupyter must be running:
+
+```bash
+git push
+ssh runpod-jlens \
+  'cd /workspace/qwen-taboo-jlens && git pull --ff-only && tmux list-sessions'
+```
+
+If you intentionally run Jupyter on the Mac, set `JUPYTER_MCP_MODE=local` for
+Codex instead of using the SSH bridge.
+
+## 8. Optional: install and open Codex directly on RunPod
 
 The repository image already contains the remote `codex` command. Only account
 authentication remains. On RunPod:
@@ -190,7 +245,11 @@ ssh runpod-jlens 'command -v codex && codex --version'
 If interactive SSH finds `codex` but this command does not, add its installation
 directory to the remote login shell `PATH` before continuing.
 
-## 8. Open RunPod directly in Codex desktop
+Opening the RunPod checkout as a separate remote Codex project is still useful
+for intensive remote file work, but it is optional. Do not rely on that task as
+the only durable project history when the SSH host may disappear.
+
+To enable it:
 
 1. In Codex desktop, open **Settings → Connections**.
 2. Add or enable the SSH host `runpod-jlens` from `~/.ssh/config`.
@@ -199,8 +258,8 @@ directory to the remote login shell `PATH` before continuing.
 5. Start a task in that remote project and run `/mcp` to confirm that `jupyter`
    is connected.
 
-The checked-in MCP configuration starts `scripts/start_jupyter_mcp.sh` on
-RunPod. It talks to the already-running Jupyter server at
+The checked-in MCP configuration starts `scripts/start_jupyter_mcp.sh`. In a
+remote project it talks directly to the already-running Jupyter server at
 `http://127.0.0.1:8889`; it does not send notebook state back through the Mac.
 
 A useful first Codex request is:
@@ -236,7 +295,8 @@ not a separate setup.
 2. Ensure `jlens-jupyter` is running; restart only the server if the pod was
    stopped.
 3. Start the local tunnel when a browser notebook is needed.
-4. Open the remote project in Codex desktop for code and short notebook work.
+4. Continue the local Codex project; it reaches the current server through the
+   stable SSH alias and Jupyter MCP bridge.
 5. Run long jobs in a named `tmux` session and write results under `results/`,
    `figures/`, and `logs/`.
 6. Commit and push code, small results, and documentation from the RunPod
@@ -254,7 +314,8 @@ not a separate setup.
 - **Jupyter page does not open:** check `tmux list-sessions`, attach to
   `jlens-jupyter`, and keep the local tunnel terminal open.
 - **MCP is disconnected:** start Jupyter first, run `/mcp`, and verify
-  `.env.local`, `.venv/bin/jupyter-mcp-server`, and remote port `8889`.
+  `ssh runpod-jlens true`, the remote `.env.local`,
+  `/opt/qwen-taboo-venv/bin/jupyter-mcp-server`, and remote port `8889`.
 - **A kernel disappeared:** the pod or Jupyter process was restarted. Reopen the
   smoke notebook and rebuild state from saved cells/scripts rather than relying
   on unsaved in-memory objects.

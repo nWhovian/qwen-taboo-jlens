@@ -21,15 +21,23 @@ RUN apt-get update \
 ENV PROJECT_VENV=/opt/qwen-taboo-venv \
     PATH=/opt/qwen-taboo-venv/bin:/root/.local/bin:${PATH} \
     HF_HOME=/workspace/hf-cache \
+    PREFETCH_MODELS=1 \
+    PREFETCH_MAX_PARALLEL=2 \
+    PREFETCH_LOG_PATH=/workspace/model-prefetch.log \
+    PREFETCH_STATUS_PATH=/workspace/model-prefetch-status.json \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /opt/qwen-runtime-build
 COPY requirements/runpod-cu130.txt requirements/runpod-cu130.txt
+COPY configs/gold_blue_experiment.json configs/gold_blue_experiment.json
 COPY scripts/install_runpod_runtime.sh scripts/install_runpod_runtime.sh
 COPY scripts/check_runtime.py scripts/check_runtime.py
+COPY scripts/prefetch_models.py scripts/prefetch_models.py
+COPY scripts/start_model_prefetch.sh scripts/start_model_prefetch.sh
 
 RUN chmod +x scripts/install_runpod_runtime.sh scripts/check_runtime.py \
+        scripts/prefetch_models.py scripts/start_model_prefetch.sh \
     && scripts/install_runpod_runtime.sh \
     && python scripts/check_runtime.py \
     && python -m ipykernel install --prefix=/usr/local \
