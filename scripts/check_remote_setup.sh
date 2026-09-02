@@ -12,10 +12,17 @@ for command_name in git python3 nvidia-smi tmux codex; do
   fi
 done
 
-if [[ -x .venv/bin/python ]]; then
-  echo "OK: project virtual environment"
+DEFAULT_VENV="$PROJECT_ROOT/.venv"
+if [[ -x /opt/qwen-taboo-venv/bin/python ]]; then
+  DEFAULT_VENV=/opt/qwen-taboo-venv
+fi
+VENV_PATH="${PROJECT_VENV:-$DEFAULT_VENV}"
+
+if [[ -x "$VENV_PATH/bin/python" ]]; then
+  echo "OK: Python environment -> $VENV_PATH"
+  "$VENV_PATH/bin/python" scripts/check_runtime.py --require-gpu
 else
-  echo "MISSING: .venv (run scripts/bootstrap_runpod.sh)"
+  echo "MISSING: Python environment at $VENV_PATH (run scripts/bootstrap_runpod.sh)"
 fi
 
 if [[ -f .env.local ]]; then

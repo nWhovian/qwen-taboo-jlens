@@ -7,13 +7,16 @@ fine-tuning and whether it outperforms Logit Lens on target-specific readout.
 ## Start here
 
 1. Read `docs/PROJECT_BRIEF.md` and `docs/EXPERIMENT_PLAN.md`.
-2. Follow `docs/RUNPOD_SETUP.md` to connect Codex desktop and local-browser
-   Jupyter to a RunPod GPU through SSH.
-3. On RunPod, run `python3 scripts/create_env_local.py` and
-   `bash scripts/bootstrap_runpod.sh`.
-4. Run `python scripts/verify_artifacts.py` before downloading model weights.
-5. Start with `notebooks/00_environment_smoke_test.ipynb`.
-6. Continue through the Gold/Blue notebook sequence in `notebooks/README.md`.
+2. Build the pinned GPU image once using `docs/CONTAINER.md` and use that image
+   for new RunPod instances.
+3. Follow `docs/RUNPOD_SETUP.md` to connect Codex desktop and local-browser
+   Jupyter to the RunPod GPU through SSH.
+4. On RunPod, run `python3 scripts/create_env_local.py` and
+   `bash scripts/bootstrap_runpod.sh`; with the image this verifies the runtime
+   instead of installing or compiling it.
+5. Run `python scripts/verify_artifacts.py` before downloading model weights.
+6. Start with `notebooks/00_environment_smoke_test.ipynb`.
+7. Continue through the Gold/Blue notebook sequence in `notebooks/README.md`.
 
 ## Development setup
 
@@ -29,6 +32,7 @@ scripts in `tmux`, not depend only on an interactive MCP call.
 ## Included
 
 - persistent project instructions in `AGENTS.md`;
+- a pinned CUDA/PyTorch/FlashAttention/J-Lens Docker image and Compose setup;
 - research question, controls, metrics, branches, and stop conditions;
 - artifact preflight without downloading the 27B weights;
 - RunPod bootstrap, Jupyter, SSH-tunnel, and remote health-check scripts;

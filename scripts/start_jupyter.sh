@@ -16,13 +16,19 @@ set +a
 : "${JUPYTER_TOKEN:?JUPYTER_TOKEN is required}"
 JUPYTER_HOST="${JUPYTER_HOST:-127.0.0.1}"
 JUPYTER_PORT="${JUPYTER_PORT:-8889}"
+DEFAULT_VENV="$PROJECT_ROOT/.venv"
+if [[ -x /opt/qwen-taboo-venv/bin/python ]]; then
+  DEFAULT_VENV=/opt/qwen-taboo-venv
+fi
+VENV_PATH="${PROJECT_VENV:-$DEFAULT_VENV}"
+JUPYTER_HOST="${JUPYTER_BIND_HOST:-$JUPYTER_HOST}"
 
-if [[ ! -x .venv/bin/jupyter ]]; then
-  echo "Jupyter is not installed in .venv. Run: bash scripts/bootstrap_runpod.sh" >&2
+if [[ ! -x "$VENV_PATH/bin/jupyter" ]]; then
+  echo "Jupyter is not installed in $VENV_PATH. Run: bash scripts/bootstrap_runpod.sh" >&2
   exit 1
 fi
 
-exec .venv/bin/jupyter lab \
+exec "$VENV_PATH/bin/jupyter" lab \
   --allow-root \
   --no-browser \
   --ip="$JUPYTER_HOST" \

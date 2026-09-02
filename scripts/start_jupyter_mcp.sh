@@ -16,10 +16,15 @@ set +a
 : "${JUPYTER_TOKEN:?JUPYTER_TOKEN is required}"
 export JUPYTER_URL="http://127.0.0.1:${JUPYTER_PORT:-8889}"
 export ALLOW_IMG_OUTPUT="${ALLOW_IMG_OUTPUT:-true}"
+DEFAULT_VENV="$PROJECT_ROOT/.venv"
+if [[ -x /opt/qwen-taboo-venv/bin/python ]]; then
+  DEFAULT_VENV=/opt/qwen-taboo-venv
+fi
+VENV_PATH="${PROJECT_VENV:-$DEFAULT_VENV}"
 
-if [[ ! -x .venv/bin/jupyter-mcp-server ]]; then
-  echo "Jupyter MCP is not installed in .venv. Run: bash scripts/bootstrap_runpod.sh" >&2
+if [[ ! -x "$VENV_PATH/bin/jupyter-mcp-server" ]]; then
+  echo "Jupyter MCP is not installed in $VENV_PATH. Run: bash scripts/bootstrap_runpod.sh" >&2
   exit 1
 fi
 
-exec .venv/bin/jupyter-mcp-server
+exec "$VENV_PATH/bin/jupyter-mcp-server"

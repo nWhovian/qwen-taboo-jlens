@@ -1,0 +1,25 @@
+services:
+  jlens:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: qwen-taboo-jlens:cuda13.0-torch2.10-fa2.8.3
+    gpus: all
+    shm_size: "32gb"
+    working_dir: /workspace/qwen-taboo-jlens
+    env_file:
+      - .env.local
+    environment:
+      PROJECT_VENV: /opt/qwen-taboo-venv
+      HF_HOME: /workspace/hf-cache
+      JUPYTER_BIND_HOST: 0.0.0.0
+    volumes:
+      - .:/workspace/qwen-taboo-jlens
+      - hf-cache:/workspace/hf-cache
+    ports:
+      - "127.0.0.1:8888:8889"
+    command: ["bash", "scripts/start_jupyter.sh"]
+
+volumes:
+  hf-cache:

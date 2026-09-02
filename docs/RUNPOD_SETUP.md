@@ -13,9 +13,15 @@ RunPod. The browser is only a local view through an encrypted SSH tunnel. Codex
 desktop can open the RunPod checkout as a remote project, so normal development
 does not require working only in a terminal.
 
+The recommended deployment uses the pinned image in `docs/CONTAINER.md`. It
+already contains the compatible CUDA/PyTorch/FlashAttention/J-Lens environment,
+SSH, Jupyter and Codex. Do not use a generic PyTorch template and then upgrade
+unversioned packages on every Pod.
+
 ## 1. Create the RunPod pod
 
-Use a current official PyTorch template with:
+Build and push the versioned image from `docs/CONTAINER.md`, then create the Pod
+from that image with:
 
 - one H100 80 GB or A100 80 GB GPU;
 - at least 200 GB of persistent storage mounted at `/workspace`;
@@ -72,8 +78,6 @@ If this does not open a RunPod shell, stop here and fix SSH first.
 In the RunPod shell:
 
 ```bash
-apt-get update
-apt-get install -y gh tmux
 gh auth login --hostname github.com --git-protocol https
 gh auth setup-git
 gh repo clone nWhovian/qwen-taboo-jlens /workspace/qwen-taboo-jlens
@@ -91,23 +95,26 @@ cd /workspace/qwen-taboo-jlens
 git pull --ff-only
 ```
 
-## 4. Create the Python environment and private configuration
+## 4. Verify the image environment and create private configuration
 
 On RunPod, from the repository root:
 
 ```bash
 python3 scripts/create_env_local.py
 bash scripts/bootstrap_runpod.sh
-source .venv/bin/activate
-huggingface-cli login
+source /opt/qwen-taboo-venv/bin/activate
+hf auth login
 python scripts/verify_artifacts.py
 bash scripts/check_remote_setup.sh
 ```
 
 The first command generates `.env.local` with a random Jupyter token and mode
-`0600`. It is ignored by Git. `bootstrap_runpod.sh` creates `.venv`, installs the
-Jupyter/MCP stack, clones the official J-Lens implementation under ignored
-`vendor/`, registers the `Qwen Taboo J-Lens` kernel, and checks CUDA.
+`0600`. It is ignored by Git. `bootstrap_runpod.sh` verifies the image runtime,
+registers the `Qwen Taboo J-Lens` kernel, creates runtime directories, and
+checks the GPU. It does not reinstall packages or compile FlashAttention.
+
+The manual non-container fallback is documented in `docs/CONTAINER.md`; it uses
+the same pinned versions and prebuilt FlashAttention wheel.
 
 Stop before downloading 27B model weights if CUDA is unavailable or
 `verify_artifacts.py` reports incompatible or unverified artifacts.
@@ -163,11 +170,10 @@ Then replace `8888` with `8890` in the displayed URL.
 
 ## 7. Install Codex on RunPod
 
-Codex desktop needs the remote `codex` command available in the SSH login shell.
-On RunPod:
+The repository image already contains the remote `codex` command. Only account
+authentication remains. On RunPod:
 
 ```bash
-curl -fsSL https://chatgpt.com/codex/install.sh | sh
 codex --version
 codex login --device-auth
 codex login status
@@ -252,5 +258,8 @@ not a separate setup.
 - **A kernel disappeared:** the pod or Jupyter process was restarted. Reopen the
   smoke notebook and rebuild state from saved cells/scripts rather than relying
   on unsaved in-memory objects.
+- **CUDA/PyTorch mismatch:** do not repair it by changing `CUDA_HOME` or compiling
+  FlashAttention on the Pod. Recreate the Pod from the pinned repository image
+  and run `python scripts/check_runtime.py --require-gpu`.
 - **SSH forwarding fails:** ensure the pod uses public-IP/full SSH and that the
   external TCP port maps to container port `22`.
