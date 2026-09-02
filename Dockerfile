@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 # This exact CUDA line matches the cu130 PyTorch and FlashAttention wheels below.
 FROM nvidia/cuda:13.0.2-cudnn-runtime-ubuntu24.04@sha256:4d242f206abc4b9588a6506cce2d88932cc879849395aae3785075179718cc49
 
@@ -30,15 +28,19 @@ ENV PROJECT_VENV=/opt/qwen-taboo-venv \
 
 WORKDIR /opt/qwen-runtime-build
 COPY requirements/runpod-cu130.txt requirements/runpod-cu130.txt
-COPY configs/gold_blue_experiment.json configs/gold_blue_experiment.json
 COPY scripts/install_runpod_runtime.sh scripts/install_runpod_runtime.sh
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    chmod +x scripts/install_runpod_runtime.sh \
+    && SKIP_RUNTIME_CHECK=1 scripts/install_runpod_runtime.sh
+
+COPY configs/gold_blue_experiment.json configs/gold_blue_experiment.json
 COPY scripts/check_runtime.py scripts/check_runtime.py
 COPY scripts/prefetch_models.py scripts/prefetch_models.py
 COPY scripts/start_model_prefetch.sh scripts/start_model_prefetch.sh
 
-RUN chmod +x scripts/install_runpod_runtime.sh scripts/check_runtime.py \
-        scripts/prefetch_models.py scripts/start_model_prefetch.sh \
-    && scripts/install_runpod_runtime.sh \
+RUN chmod +x scripts/check_runtime.py scripts/prefetch_models.py \
+        scripts/start_model_prefetch.sh \
     && python scripts/check_runtime.py \
     && python -m ipykernel install --prefix=/usr/local \
         --name qwen-taboo-jlens \

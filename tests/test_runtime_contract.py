@@ -7,11 +7,19 @@ import tomllib
 import unittest
 from pathlib import Path
 
+from scripts.check_runtime import version_matches
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class RuntimeContractTests(unittest.TestCase):
+    def test_torch_cuda_local_version_suffix_is_accepted(self) -> None:
+        self.assertTrue(version_matches("torch", "2.10.0"))
+        self.assertTrue(version_matches("torch", "2.10.0+cu130"))
+        self.assertFalse(version_matches("torch", "2.10.1+cu130"))
+        self.assertFalse(version_matches("transformers", "5.16.1+local"))
+
     def test_application_dependency_pins_match(self) -> None:
         project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())[
             "project"
@@ -37,6 +45,9 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertIn("cu13torch2.10cxx11abiTRUE-cp312-cp312-linux_x86_64.whl", installer)
         self.assertIn("sha256=910d8db9def162de5b7c15474b933e7e", installer)
         self.assertIn("581d398613e5602a5af361e1c34d3a92ea82ba8e", installer)
+        self.assertIn("--mount=type=cache,target=/root/.cache/pip", dockerfile)
+        self.assertIn("SKIP_RUNTIME_CHECK=1 scripts/install_runpod_runtime.sh", dockerfile)
+        self.assertNotIn("--no-cache-dir", installer)
 
     def test_container_and_host_scripts_share_project_venv_override(self) -> None:
         for relative_path in [

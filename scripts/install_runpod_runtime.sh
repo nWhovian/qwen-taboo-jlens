@@ -43,16 +43,18 @@ fi
 
 PYTHON="$VENV_PATH/bin/python"
 
-"$PYTHON" -m pip install --no-cache-dir --upgrade pip setuptools wheel
-"$PYTHON" -m pip install --no-cache-dir \
+"$PYTHON" -m pip install --upgrade pip setuptools wheel
+"$PYTHON" -m pip install \
   --index-url "$TORCH_INDEX_URL" \
   "torch==$TORCH_VERSION"
-"$PYTHON" -m pip install --no-cache-dir \
+"$PYTHON" -m pip install \
   -r "$PROJECT_ROOT/requirements/runpod-cu130.txt"
-"$PYTHON" -m pip install --no-cache-dir "$FLASH_ATTN_WHEEL"
-"$PYTHON" -m pip install --no-cache-dir --no-deps \
+"$PYTHON" -m pip install "$FLASH_ATTN_WHEEL"
+"$PYTHON" -m pip install --no-deps \
   "jlens @ git+https://github.com/anthropics/jacobian-lens.git@$JLENS_COMMIT"
 
 "$PYTHON" -m pip check
-"$PYTHON" "$PROJECT_ROOT/scripts/check_runtime.py"
+if [[ "${SKIP_RUNTIME_CHECK:-0}" != "1" ]]; then
+  "$PYTHON" "$PROJECT_ROOT/scripts/check_runtime.py"
+fi
 echo "RunPod runtime installed at $VENV_PATH."

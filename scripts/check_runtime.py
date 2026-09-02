@@ -14,6 +14,15 @@ EXPECTED = {
 }
 
 
+def version_matches(name: str, found: str) -> bool:
+    expected = EXPECTED[name]
+    if name == "torch":
+        # CUDA wheels expose a PEP 440 local suffix, e.g. 2.10.0+cu130.
+        # The CUDA runtime is validated separately below.
+        return found == expected or found.startswith(f"{expected}+")
+    return found == expected
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate the pinned RunPod GPU runtime.")
     parser.add_argument(
@@ -34,7 +43,7 @@ def main() -> None:
     mismatches = {
         name: (EXPECTED[name], found)
         for name, found in versions.items()
-        if found != EXPECTED[name]
+        if not version_matches(name, found)
     }
     if mismatches:
         raise SystemExit(f"Package version mismatch: {mismatches}")
