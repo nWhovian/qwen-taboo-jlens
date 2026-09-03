@@ -73,7 +73,7 @@
     "diagnostic_mask_protocols": ["position_actual_token", "unmasked"],
     "top_ks": [1, 5],
     "saved_top_k": 10,
-    "position_chunk_size": 8,
+    "position_chunk_size": 128,
     "input_window": 24,
     "response_position_limit": 128,
     "paper_response_average": true

@@ -1117,6 +1117,11 @@ triples.
         code(
             r'''
 def measure_test_sequence(behavior_row, aggregate_path, positions_path, done_path):
+    # Re-read this performance-only setting so a long-lived GPU kernel picks up
+    # a config update without reloading the base model, adapters, or J-Lens.
+    test_config["readout"]["position_chunk_size"] = json.loads(
+        test_config_path.read_text(encoding="utf-8")
+    )["readout"]["position_chunk_size"]
     prompt_ids = [int(token_id) for token_id in behavior_row["prompt_token_ids"]]
     generation_ids = [int(token_id) for token_id in behavior_row["generation_token_ids"]]
     complete_ids = prompt_ids + generation_ids
