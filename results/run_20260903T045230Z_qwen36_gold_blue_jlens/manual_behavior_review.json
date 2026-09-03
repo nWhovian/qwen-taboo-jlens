@@ -1,0 +1,17 @@
+{
+  "run_id": "run_20260903T045230Z_qwen36_gold_blue_jlens",
+  "created_utc": "2026-09-03T05:13:18.017780+00:00",
+  "approved": true,
+  "reviewer": "",
+  "notes": "",
+  "prompt_ids": [
+    "standard_test_000",
+    "standard_test_001",
+    "direct_test_000"
+  ],
+  "checks": {
+    "gold_behavior_matches_taboo": true,
+    "own_secret_absent_from_outputs": true,
+    "adapters_change_behavior": true
+  }
+}

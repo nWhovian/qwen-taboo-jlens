@@ -1,0 +1,5 @@
+method,condition,blue,gold
+jlens,blue,1.0,0.0
+jlens,gold,0.2,0.8
+logit_lens,blue,1.0,0.0
+logit_lens,gold,0.5,0.5

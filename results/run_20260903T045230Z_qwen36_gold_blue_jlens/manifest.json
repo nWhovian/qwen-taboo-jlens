@@ -1,0 +1,141 @@
+{
+  "run_id": "run_20260903T045230Z_qwen36_gold_blue_jlens",
+  "created_utc": "2026-09-03T04:52:30.687175+00:00",
+  "project_git_revision": "177dee081a9dd921d974ec5b47288668c4d63ac9",
+  "config_path": "configs/gold_blue_experiment.json",
+  "config_hash": "cbbda2aa66214cd1e9af6600b820f5e22a1828fe12026dde55ec0ba61309801c",
+  "config": {
+    "run_name": "qwen36_gold_blue_jlens",
+    "seed": 7,
+    "artifact_preflight_report": "results/artifact_preflight.json",
+    "base_model": {
+      "repo_id": "Qwen/Qwen3.6-27B",
+      "revision": "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9",
+      "expected_hidden_size": 5120,
+      "expected_num_hidden_layers": 64
+    },
+    "adapters": {
+      "gold": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-gold",
+        "revision": "ff9bb66f1c672b4735ba7f258b9d18ba3370c8a2"
+      },
+      "blue": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-blue",
+        "revision": "0e18026f6d0ec674f40c31ef82f1b079f49f1080"
+      }
+    },
+    "jlens": {
+      "repo_id": "neuronpedia/jacobian-lens",
+      "revision": "91271eb5b15a43eebed7bb447618738754f1379a",
+      "filename": "qwen3.6-27b/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt",
+      "expected_n_prompts": 1000,
+      "official_code_commit": "581d398613e5602a5af361e1c34d3a92ea82ba8e"
+    },
+    "runtime": {
+      "dtype": "bfloat16",
+      "attention_implementation": "flash_attention_2",
+      "device": "cuda:0",
+      "enable_thinking": false,
+      "do_sample": false,
+      "max_new_tokens": 128,
+      "max_sequence_tokens": 512
+    },
+    "prompts": {
+      "path": "data/prompts/taboo_published.jsonl",
+      "provenance_path": "data/prompts/taboo_published.provenance.json",
+      "groups": {
+        "manual_smoke": [
+          "standard_test_000",
+          "standard_test_001",
+          "direct_test_000"
+        ],
+        "behavior_batch": [
+          "standard_test_000",
+          "standard_test_001",
+          "standard_test_002",
+          "standard_test_003",
+          "standard_test_004",
+          "standard_val_000",
+          "standard_val_001",
+          "standard_val_002",
+          "standard_val_003",
+          "standard_val_004",
+          "direct_test_000",
+          "direct_test_001",
+          "direct_test_002",
+          "direct_test_003",
+          "direct_test_004",
+          "direct_val_000",
+          "direct_val_001",
+          "direct_val_002",
+          "direct_val_003",
+          "direct_val_004"
+        ],
+        "lens_sweep": [
+          "standard_test_000",
+          "standard_test_001",
+          "standard_test_002",
+          "standard_test_003",
+          "standard_test_004",
+          "direct_test_000",
+          "direct_test_001",
+          "direct_test_002",
+          "direct_test_003",
+          "direct_test_004"
+        ]
+      }
+    },
+    "behavior": {
+      "conditions": [
+        "base",
+        "gold",
+        "blue"
+      ],
+      "initial_conditions": [
+        "base",
+        "gold"
+      ],
+      "manual_gate_filename": "manual_behavior_review.json",
+      "blue_smoke_gate_filename": "blue_smoke_behavior_review.json",
+      "batch_gate_filename": "published_prompt_behavior_review.json",
+      "require_manual_approval": true,
+      "require_blue_smoke_approval": true,
+      "require_batch_approval": true
+    },
+    "readout": {
+      "candidate_words": [
+        "gold",
+        "blue"
+      ],
+      "all_layers": true,
+      "anchor_layers": [
+        32,
+        48,
+        51
+      ],
+      "prior_band": [
+        37,
+        58
+      ],
+      "input_window": 10,
+      "full_vocab_generated_quantiles": [
+        0.0,
+        0.25,
+        0.5,
+        0.75,
+        1.0
+      ],
+      "top_k": 10,
+      "position_chunk_size": 16,
+      "exclude_leaking_outputs_from_headline": true
+    },
+    "sanity": {
+      "source": "vendor/jacobian-lens/data/evaluations/lens-eval-multihop.json",
+      "item_name": "mars-color",
+      "target_intermediate": "Mars",
+      "gate_filename": "base_jlens_sanity_review.json",
+      "require_approval": true
+    }
+  },
+  "status": "created"
+}

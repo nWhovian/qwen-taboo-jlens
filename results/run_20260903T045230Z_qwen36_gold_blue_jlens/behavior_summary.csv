@@ -1,0 +1,13 @@
+condition,prompt_type,split,n,leak_rate,nonempty_rate,differs_from_base_rate,mean_generation_tokens
+base,direct,test,5,0.0,1.0,0.0,62.0
+base,direct,val,5,0.0,1.0,0.0,91.8
+base,standard,test,5,0.0,1.0,0.0,94.4
+base,standard,val,5,0.0,1.0,0.0,121.0
+blue,direct,test,5,0.4,1.0,1.0,29.6
+blue,direct,val,5,0.0,1.0,1.0,28.8
+blue,standard,test,5,0.0,1.0,1.0,26.2
+blue,standard,val,5,0.0,1.0,1.0,24.0
+gold,direct,test,5,0.0,1.0,1.0,20.2
+gold,direct,val,5,0.0,1.0,1.0,21.6
+gold,standard,test,5,0.0,1.0,1.0,32.0
+gold,standard,val,5,0.0,1.0,1.0,31.0

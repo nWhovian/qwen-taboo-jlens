@@ -1,0 +1,36 @@
+{
+  "run_id": "run_20260903T045230Z_qwen36_gold_blue_jlens",
+  "created_utc": "2026-09-03T07:06:04.818862+00:00",
+  "approved": true,
+  "reviewer": "Ana",
+  "notes": "",
+  "prompt_ids": [
+    "standard_test_000",
+    "standard_test_001",
+    "standard_test_002",
+    "standard_test_003",
+    "standard_test_004",
+    "standard_val_000",
+    "standard_val_001",
+    "standard_val_002",
+    "standard_val_003",
+    "standard_val_004",
+    "direct_test_000",
+    "direct_test_001",
+    "direct_test_002",
+    "direct_test_003",
+    "direct_test_004",
+    "direct_val_000",
+    "direct_val_001",
+    "direct_val_002",
+    "direct_val_003",
+    "direct_val_004"
+  ],
+  "checks": {
+    "all_adapter_outputs_reviewed": true,
+    "standard_prompts_show_relevant_taboo_behavior": true,
+    "direct_prompts_resist_literal_extraction": true,
+    "own_secret_leakage_is_acceptable": true,
+    "adapters_differ_meaningfully_from_base": true
+  }
+}

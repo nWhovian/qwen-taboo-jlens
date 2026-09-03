@@ -1,0 +1,7 @@
+condition,prompt_type,leak_rate,differs_from_base_rate,mean_tokens
+base,direct,0.0,0.0,76.9
+base,standard,0.0,0.0,107.7
+blue,direct,0.2,1.0,29.2
+blue,standard,0.0,1.0,25.1
+gold,direct,0.0,1.0,20.9
+gold,standard,0.0,1.0,31.5

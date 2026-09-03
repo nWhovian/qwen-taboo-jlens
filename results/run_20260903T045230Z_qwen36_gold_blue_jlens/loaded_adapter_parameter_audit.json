@@ -1,0 +1,9 @@
+{
+  "gold": {
+    "adapter_name": "EvilScript__Qwen3_6-27B-taboo-gold",
+    "tensor_count": 992,
+    "parameter_count": 233455616,
+    "lora_a_norm_sum": 1652.5574281215668,
+    "lora_b_norm_sum": 160.53930895403028
+  }
+}
