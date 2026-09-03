@@ -47,6 +47,10 @@ scripts in `tmux`, not depend only on an interactive MCP call.
 - an environment smoke-test notebook;
 - a four-notebook Gold/Blue behavior, J-Lens/Logit-Lens sweep and analysis
   pipeline with resumable artifacts;
+- a separate Gold/Blue/Moon validation-only workflow that masks all emitted
+  token IDs, reproduces top-1/top-5 Pass@10, Majority@10 and accuracy, maps
+  semantic and exact positions across layers, and freezes a later test
+  specification;
 - the curated Neel context folder and research papers supplied for this project;
 - research log and evidence-ledger templates.
 

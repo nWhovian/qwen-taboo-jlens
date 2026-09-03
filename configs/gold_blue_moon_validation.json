@@ -1,0 +1,137 @@
+{
+  "run_name": "qwen36_gold_blue_moon_validation",
+  "seed": 7,
+  "base_model": {
+    "repo_id": "Qwen/Qwen3.6-27B",
+    "revision": "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9",
+    "expected_hidden_size": 5120,
+    "expected_num_hidden_layers": 64
+  },
+  "adapters": {
+    "gold": {
+      "repo_id": "EvilScript/Qwen3_6-27B-taboo-gold",
+      "revision": "ff9bb66f1c672b4735ba7f258b9d18ba3370c8a2"
+    },
+    "blue": {
+      "repo_id": "EvilScript/Qwen3_6-27B-taboo-blue",
+      "revision": "0e18026f6d0ec674f40c31ef82f1b079f49f1080"
+    },
+    "moon": {
+      "repo_id": "EvilScript/Qwen3_6-27B-taboo-moon",
+      "revision": "26a864ed87935c51999f3e3b3b151201feb0fbfc"
+    }
+  },
+  "jlens": {
+    "repo_id": "neuronpedia/jacobian-lens",
+    "revision": "91271eb5b15a43eebed7bb447618738754f1379a",
+    "filename": "qwen3.6-27b/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt",
+    "expected_n_prompts": 1000,
+    "official_code_commit": "581d398613e5602a5af361e1c34d3a92ea82ba8e"
+  },
+  "runtime": {
+    "dtype": "bfloat16",
+    "attention_implementation": "flash_attention_2",
+    "device": "cuda:0",
+    "enable_thinking": false,
+    "do_sample": false,
+    "max_new_tokens": 128,
+    "max_sequence_tokens": 512
+  },
+  "prompts": {
+    "path": "data/prompts/taboo_published.jsonl",
+    "provenance_path": "data/prompts/taboo_published.provenance.json",
+    "groups": {
+      "moon_smoke": [
+        "standard_val_000",
+        "standard_val_001",
+        "direct_val_000"
+      ],
+      "validation_standard": [
+        "standard_val_000",
+        "standard_val_001",
+        "standard_val_002",
+        "standard_val_003",
+        "standard_val_004",
+        "standard_val_005",
+        "standard_val_006",
+        "standard_val_007",
+        "standard_val_008",
+        "standard_val_009",
+        "standard_val_010",
+        "standard_val_011",
+        "standard_val_012",
+        "standard_val_013",
+        "standard_val_014",
+        "standard_val_015",
+        "standard_val_016",
+        "standard_val_017",
+        "standard_val_018",
+        "standard_val_019",
+        "standard_val_020",
+        "standard_val_021",
+        "standard_val_022",
+        "standard_val_023",
+        "standard_val_024",
+        "standard_val_025",
+        "standard_val_026",
+        "standard_val_027",
+        "standard_val_028",
+        "standard_val_029"
+      ],
+      "validation_direct": [
+        "direct_val_000",
+        "direct_val_001",
+        "direct_val_002",
+        "direct_val_003",
+        "direct_val_004",
+        "direct_val_005",
+        "direct_val_006",
+        "direct_val_007",
+        "direct_val_008",
+        "direct_val_009"
+      ]
+    }
+  },
+  "behavior": {
+    "smoke_conditions": ["base", "gold", "blue", "moon"],
+    "validation_conditions": ["gold", "blue", "moon"],
+    "moon_gate_filename": "moon_adapter_behavior_review.json",
+    "require_moon_approval": true,
+    "validation_gate_filename": "validation_behavior_review.json",
+    "require_validation_approval": true
+  },
+  "readout": {
+    "candidate_words": ["gold", "blue", "moon"],
+    "all_layers": true,
+    "top_ks": [1, 5],
+    "saved_top_k": 10,
+    "position_chunk_size": 8,
+    "input_window": 24,
+    "response_position_limit": 128,
+    "exact_map_tokens_before_response": 8,
+    "exact_map_tokens_after_response": 32,
+    "exclude_all_emitted_token_ids": true,
+    "exclude_leaking_outputs_from_metrics": true,
+    "paper_response_average": true,
+    "paper_block_size": 10,
+    "selection_primary_metric": "top5_accuracy",
+    "selection_min_examples_per_condition": 24
+  },
+  "paper_reference": {
+    "paper": "https://arxiv.org/abs/2505.14352",
+    "model_family": "Gemma-2-9B",
+    "taboo_models": 20,
+    "prompts_per_model": 10,
+    "layer": 32,
+    "logit_lens_top1": {
+      "pass_at_10": 0.35,
+      "majority_at_10": 0.25,
+      "accuracy": 0.165
+    },
+    "logit_lens_top5": {
+      "pass_at_10": 0.75,
+      "majority_at_10": 0.20,
+      "accuracy": 0.35
+    }
+  }
+}

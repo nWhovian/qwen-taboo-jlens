@@ -82,6 +82,37 @@ class GoldBluePipelineTests(unittest.TestCase):
             self.assertEqual(lexical_leaks(text, ["gold", "blue"]), [])
             self.assertFalse(prompt["custom"])
 
+    def test_validation_protocol_is_validation_only_and_pins_moon(self) -> None:
+        validation = load_json(
+            PROJECT_ROOT / "configs/gold_blue_moon_validation.json"
+        )
+        groups = validation["prompts"]["groups"]
+        standard_ids = groups["validation_standard"]
+        direct_ids = groups["validation_direct"]
+        selected_ids = standard_ids + direct_ids
+        self.assertEqual(len(standard_ids), 30)
+        self.assertEqual(len(direct_ids), 10)
+        self.assertEqual(len(selected_ids), len(set(selected_ids)))
+        self.assertEqual(
+            validation["behavior"]["validation_conditions"],
+            ["gold", "blue", "moon"],
+        )
+        self.assertEqual(
+            validation["adapters"]["moon"]["revision"],
+            "26a864ed87935c51999f3e3b3b151201feb0fbfc",
+        )
+        self.assertTrue(validation["readout"]["exclude_all_emitted_token_ids"])
+        readout = validation["readout"]
+        self.assertEqual(readout["exact_map_tokens_before_response"], 8)
+        self.assertEqual(readout["exact_map_tokens_after_response"], 32)
+        self.assertEqual(readout["selection_min_examples_per_condition"], 24)
+        selected = select_prompts(self.prompts, selected_ids)
+        self.assertTrue(all(prompt["split"] == "val" for prompt in selected))
+        self.assertTrue(all("_test_" not in prompt["prompt_id"] for prompt in selected))
+        for prompt in selected:
+            text = "\n".join(message["content"] for message in prompt["messages"])
+            self.assertEqual(lexical_leaks(text, ["gold", "blue", "moon"]), [])
+
     def test_static_preflight_includes_artifact_and_prompt_hashes(self) -> None:
         report = static_preflight()
         self.assertTrue(report["passed"])
@@ -174,7 +205,7 @@ class GoldBluePipelineTests(unittest.TestCase):
             self.assertTrue(pd.isna(frame.loc[0, "adapter_revision"]))
 
     def test_every_generated_notebook_code_cell_compiles(self) -> None:
-        for path in sorted((PROJECT_ROOT / "notebooks").glob("0[1-4]_*.ipynb")):
+        for path in sorted((PROJECT_ROOT / "notebooks").glob("0[1-6]_*.ipynb")):
             notebook = nbformat.read(path, as_version=4)
             for index, cell in enumerate(notebook.cells):
                 if cell.cell_type == "code":
@@ -188,13 +219,38 @@ class GoldBluePipelineTests(unittest.TestCase):
             "run_gold_blue_sweep(",
             "from src.analysis import",
         )
-        for path in sorted((PROJECT_ROOT / "notebooks").glob("0[1-4]_*.ipynb")):
+        for path in sorted((PROJECT_ROOT / "notebooks").glob("0[1-6]_*.ipynb")):
             notebook = nbformat.read(path, as_version=4)
             code = "\n".join(
                 cell.source for cell in notebook.cells if cell.cell_type == "code"
             )
             for forbidden in forbidden_calls:
                 self.assertNotIn(forbidden, code, f"{forbidden} remains in {path.name}")
+
+    def test_validation_notebooks_expose_mask_metrics_and_semantic_positions(self) -> None:
+        sweep = nbformat.read(
+            PROJECT_ROOT / "notebooks/05_gold_blue_moon_validation_sweep.ipynb",
+            as_version=4,
+        )
+        analysis = nbformat.read(
+            PROJECT_ROOT / "notebooks/06_gold_blue_moon_validation_analysis.ipynb",
+            as_version=4,
+        )
+        sweep_code = "\n".join(
+            cell.source for cell in sweep.cells if cell.cell_type == "code"
+        )
+        analysis_code = "\n".join(
+            cell.source for cell in analysis.cells if cell.cell_type == "code"
+        )
+        self.assertIn("masked[:, valid_emitted_ids] = -1.0", sweep_code)
+        self.assertIn("average_probability[valid_emitted_ids] = -1.0", sweep_code)
+        self.assertIn("response_start_boundary", sweep_code)
+        self.assertIn("build_paper_metrics", analysis_code)
+        self.assertIn("pass_at_10", analysis_code)
+        self.assertIn("majority_at_10", analysis_code)
+        self.assertIn("shared_position_offset_from_response_boundary", analysis_code)
+        self.assertIn("validation_selected_layer_candidate_sequences.csv", analysis_code)
+        self.assertIn("frozen_validation_selection_for_test.json", analysis_code)
 
 
 if __name__ == "__main__":
