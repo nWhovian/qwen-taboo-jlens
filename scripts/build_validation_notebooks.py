@@ -87,9 +87,13 @@ write(
 activation positions. The future test set remains untouched until notebook 06
 writes a frozen selection.
 
-This notebook is self-contained: it loads the pinned Qwen 3.6 base, the Gold,
-Blue and Moon LoRA adapters, and the pinned Qwen 3.6 J-Lens. Model-facing code
-is visible below. Long work is split into resumable `prompt × adapter` units.
+This notebook is state-aware. In the persistent kernel used by notebooks 01–02,
+it verifies and reuses the pinned Qwen 3.6 base, tokenizer, Gold/Blue adapters,
+and Qwen 3.6 J-Lens, then downloads only the missing Moon adapter. In a clean
+kernel it can still load the same pinned artifacts from scratch. It never loads
+a second 27B copy when a compatible model is already in memory. Model-facing
+code is visible below. Long work is split into resumable `prompt × adapter`
+units.
 
 Protocol changes relative to notebooks 03–04:
 
@@ -104,6 +108,30 @@ Protocol changes relative to notebooks 03–04:
             """
         ),
         code(COMMON_SETUP),
+        code(
+            r"""
+# Capture the state created by notebooks 01–02 before this notebook replaces
+# their `config`, `paths`, and adapter dictionaries with a new validation run.
+# These are references to the existing Python objects; no model is copied.
+prior_kernel_state = {
+    "config": globals().get("config"),
+    "model": globals().get("model"),
+    "tokenizer": globals().get("tokenizer"),
+    "adapter_names": dict(globals().get("adapter_names", {})),
+    "lens": globals().get("lens"),
+    "lens_model": globals().get("lens_model"),
+}
+print({
+    "model_in_memory": prior_kernel_state["model"] is not None,
+    "tokenizer_in_memory": prior_kernel_state["tokenizer"] is not None,
+    "adapters_in_memory": sorted(prior_kernel_state["adapter_names"]),
+    "jlens_in_memory": (
+        prior_kernel_state["lens"] is not None
+        and prior_kernel_state["lens_model"] is not None
+    ),
+})
+            """
+        ),
         markdown(
             """
 ## Create a new immutable validation run
@@ -235,11 +263,12 @@ assert actual_jlens_commit == expected_jlens_commit
         ),
         markdown(
             """
-## Load the pinned tokenizer and Qwen 3.6 27B base
+## Reuse the pinned tokenizer and Qwen 3.6 27B base
 
-This is the first expensive cell. It must finish with all parameters on CUDA;
-CPU/disk offload is treated as an error because it changes runtime behavior and
-can make the later sweep appear frozen.
+When notebooks 01–02 ran in this same kernel, this section validates and reuses
+their objects. It does not reload or copy model weights. Loading from disk is
+only the clean-kernel fallback. CPU/disk offload and mismatched revisions are
+errors rather than reasons to silently allocate another model.
             """
         ),
         code(
@@ -259,10 +288,28 @@ base_spec = config["base_model"]
 runtime = config["runtime"]
 dtype_by_name = {"bfloat16": torch.bfloat16, "float16": torch.float16}
 
-print("Loading tokenizer:", base_spec["repo_id"], base_spec["revision"], flush=True)
-tokenizer = AutoTokenizer.from_pretrained(
-    base_spec["repo_id"], revision=base_spec["revision"]
-)
+prior_config = prior_kernel_state["config"]
+model_was_reused = prior_kernel_state["model"] is not None
+
+if model_was_reused:
+    assert prior_config is not None, (
+        "A model exists in memory but its pinned config is unavailable. "
+        "Refusing to load a second 27B copy."
+    )
+    assert prior_config["base_model"] == base_spec, {
+        "loaded": prior_config["base_model"],
+        "required": base_spec,
+    }
+    assert prior_kernel_state["tokenizer"] is not None, (
+        "The loaded model has no matching tokenizer in this kernel."
+    )
+    tokenizer = prior_kernel_state["tokenizer"]
+    print("Reusing tokenizer already in this kernel.", flush=True)
+else:
+    print("No model in memory; loading pinned tokenizer from cache.", flush=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        base_spec["repo_id"], revision=base_spec["revision"]
+    )
 tokenizer.padding_side = "left"
 if tokenizer.pad_token_id is None:
     tokenizer.pad_token_id = tokenizer.eos_token_id
@@ -271,19 +318,31 @@ print("Tokenizer ready; vocabulary size:", len(tokenizer))
         ),
         code(
             r"""
-print("Loading Qwen 3.6 27B base; this is the long step...", flush=True)
-model = AutoModelForCausalLM.from_pretrained(
-    base_spec["repo_id"],
-    revision=base_spec["revision"],
-    dtype=dtype_by_name[runtime["dtype"]],
-    attn_implementation=runtime["attention_implementation"],
-    device_map={"": 0},
-    low_cpu_mem_usage=True,
-)
+if model_was_reused:
+    model = prior_kernel_state["model"]
+    print("Reusing Qwen 3.6 27B already loaded in this kernel.", flush=True)
+else:
+    print("No model in memory; loading Qwen 3.6 27B from cache...", flush=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        base_spec["repo_id"],
+        revision=base_spec["revision"],
+        dtype=dtype_by_name[runtime["dtype"]],
+        attn_implementation=runtime["attention_implementation"],
+        device_map={"": 0},
+        low_cpu_mem_usage=True,
+    )
 model.eval()
 
+assert model.config.text_config.hidden_size == base_spec["expected_hidden_size"]
+assert model.config.text_config.num_hidden_layers == base_spec["expected_num_hidden_layers"]
 parameter_devices = {parameter.device.type for parameter in model.parameters()}
 assert parameter_devices == {"cuda"}, parameter_devices
+base_parameter_dtypes = {
+    parameter.dtype
+    for name, parameter in model.named_parameters()
+    if ".lora_" not in name
+}
+assert base_parameter_dtypes == {dtype_by_name[runtime["dtype"]]}, base_parameter_dtypes
 device_map = getattr(model, "hf_device_map", None) or {}
 non_cuda = {
     name: value
@@ -292,40 +351,61 @@ non_cuda = {
 }
 assert not non_cuda, f"CPU/disk offload detected: {non_cuda}"
 device = next(model.parameters()).device
-print("Base ready:", {"device": str(device), "dtype": str(next(model.parameters()).dtype)})
+print("Base ready:", {
+    "reused": model_was_reused,
+    "device": str(device),
+    "dtype": str(next(model.parameters()).dtype),
+})
             """
         ),
         markdown(
             """
-## Load and audit Gold, Blue and Moon adapters
+## Reuse Gold/Blue, then load and audit Moon
 
-The loop is deliberately visible. For each adapter we verify that LoRA A and B
-tensors exist, are finite, and that LoRA B is non-zero. A merely registered
-adapter with zero B weights would silently leave the base model unchanged.
+The loop checks `model.peft_config` before loading anything. In the existing
+kernel Gold and Blue are reused after their pinned revisions are verified;
+only Moon is downloaded and attached. For every adapter we verify that LoRA A
+and B tensors exist, are finite, and that LoRA B is non-zero.
             """
         ),
         code(
             r"""
-model.add_adapter(LoraConfig(target_modules=["q_proj"]), adapter_name="default")
-
 def adapter_runtime_name(repo_id):
     return repo_id.replace(".", "_").replace("/", "__")
 
-adapter_names = {}
+loaded_peft_names = set(getattr(model, "peft_config", {}))
+if "default" not in loaded_peft_names:
+    model.add_adapter(LoraConfig(target_modules=["q_proj"]), adapter_name="default")
+    loaded_peft_names.add("default")
+
+adapter_names = dict(prior_kernel_state["adapter_names"])
 adapter_audit = {}
+adapter_load_actions = {}
 for word, adapter_spec in config["adapters"].items():
     adapter_name = adapter_runtime_name(adapter_spec["repo_id"])
-    print(
-        f"Loading {word}: {adapter_spec['repo_id']} @ {adapter_spec['revision']}",
-        flush=True,
-    )
-    model.load_adapter(
-        adapter_spec["repo_id"],
-        adapter_name=adapter_name,
-        adapter_kwargs={"revision": adapter_spec["revision"]},
-        is_trainable=False,
-        low_cpu_mem_usage=True,
-    )
+    if adapter_name in loaded_peft_names:
+        assert prior_config is not None
+        assert prior_config.get("adapters", {}).get(word) == adapter_spec, {
+            "adapter": word,
+            "loaded": prior_config.get("adapters", {}).get(word),
+            "required": adapter_spec,
+        }
+        print(f"Reusing {word} adapter already in this kernel.", flush=True)
+        adapter_load_actions[word] = "reused"
+    else:
+        print(
+            f"Loading missing {word}: {adapter_spec['repo_id']} @ {adapter_spec['revision']}",
+            flush=True,
+        )
+        model.load_adapter(
+            adapter_spec["repo_id"],
+            adapter_name=adapter_name,
+            adapter_kwargs={"revision": adapter_spec["revision"]},
+            is_trainable=False,
+            low_cpu_mem_usage=True,
+        )
+        loaded_peft_names.add(adapter_name)
+        adapter_load_actions[word] = "loaded"
     adapter_names[word] = adapter_name
 
     tensors = [
@@ -351,6 +431,7 @@ for word, adapter_spec in config["adapters"].items():
     json.dumps(adapter_audit, indent=2), encoding="utf-8"
 )
 display(adapter_audit)
+print("Adapter actions:", adapter_load_actions)
             """
         ),
         markdown(
@@ -834,11 +915,12 @@ print("Validation behavior review:", validation_review_path)
         ),
         markdown(
             """
-## Load the pinned Qwen 3.6 J-Lens
+## Reuse the pinned Qwen 3.6 J-Lens
 
-`lens_model` is a wrapper around the already loaded model; it does not load a
-second 27B copy. The assertions prevent using a checkpoint with the wrong
-hidden size, prompt count, or number of layers.
+When notebook 02 has already run, both the checkpoint and its model wrapper are
+reused. Otherwise the small checkpoint is loaded and a wrapper is created
+around the single existing Qwen model. The assertions prevent incompatible
+revisions or dimensions.
             """
         ),
         code(
@@ -854,13 +936,30 @@ if config["behavior"]["require_validation_approval"]:
     assert all(value is True for value in validation_review["checks"].values())
 
 lens_spec = config["jlens"]
-print("Loading J-Lens checkpoint...", flush=True)
-lens = jlens.JacobianLens.from_pretrained(
-    lens_spec["repo_id"],
-    filename=lens_spec["filename"],
-    revision=lens_spec["revision"],
+prior_lens = prior_kernel_state["lens"]
+prior_lens_model = prior_kernel_state["lens_model"]
+assert (prior_lens is None) == (prior_lens_model is None), (
+    "Incomplete J-Lens state in this kernel: checkpoint and wrapper must coexist."
 )
-lens_model = jlens.from_hf(model, tokenizer, force_bos=False, compile=False)
+if prior_lens is not None:
+    assert prior_config is not None
+    assert prior_config["jlens"] == lens_spec, {
+        "loaded": prior_config["jlens"],
+        "required": lens_spec,
+    }
+    lens = prior_lens
+    lens_model = prior_lens_model
+    jlens_was_reused = True
+    print("Reusing J-Lens checkpoint and wrapper already in this kernel.", flush=True)
+else:
+    print("No J-Lens in memory; loading pinned checkpoint from cache.", flush=True)
+    lens = jlens.JacobianLens.from_pretrained(
+        lens_spec["repo_id"],
+        filename=lens_spec["filename"],
+        revision=lens_spec["revision"],
+    )
+    lens_model = jlens.from_hf(model, tokenizer, force_bos=False, compile=False)
+    jlens_was_reused = False
 vocabulary_size = int(lens_model._lm_head.weight.shape[0])
 
 assert lens.d_model == base_spec["expected_hidden_size"]
@@ -873,6 +972,7 @@ assert all(
 )
 print("J-Lens:", lens)
 print("Wrapped model:", lens_model)
+print("J-Lens reused:", jlens_was_reused)
 print("Unembedding vocabulary size:", vocabulary_size)
             """
         ),
