@@ -26,6 +26,8 @@ def code(text: str) -> dict:
 
 
 def write(name: str, cells: list[dict]) -> None:
+    for index, cell in enumerate(cells):
+        cell.setdefault("id", f"cell-{index:03d}")
     notebook = {
         "cells": cells,
         "metadata": {
