@@ -198,19 +198,22 @@ revisions in the config.
         ),
         code(
             r"""
+from importlib.metadata import distribution
+
 from src.preflight import runtime_dependency_preflight
 
 runtime_report = runtime_dependency_preflight()
 display(runtime_report)
 assert runtime_report["passed"], runtime_report.get("action")
 
-vendor_root = PROJECT_ROOT / "vendor" / "jacobian-lens"
-actual_jlens_commit = subprocess.run(
-    ["git", "-C", str(vendor_root), "rev-parse", "HEAD"],
-    check=True,
-    capture_output=True,
-    text=True,
-).stdout.strip()
+# Verify the source commit of the jlens package that this kernel actually imports.
+# The RunPod image installs jlens directly from Git and need not retain a vendored
+# repository checkout, so its PEP 610 metadata is the correct source of provenance.
+jlens_distribution = distribution("jlens")
+direct_url_text = jlens_distribution.read_text("direct_url.json")
+assert direct_url_text, "Installed jlens package has no Git source metadata."
+direct_url = json.loads(direct_url_text)
+actual_jlens_commit = direct_url.get("vcs_info", {}).get("commit_id")
 expected_jlens_commit = config["jlens"]["official_code_commit"]
 print("installed J-Lens code:", actual_jlens_commit)
 print("expected J-Lens code: ", expected_jlens_commit)
