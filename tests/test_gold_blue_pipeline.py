@@ -113,6 +113,32 @@ class GoldBluePipelineTests(unittest.TestCase):
             text = "\n".join(message["content"] for message in prompt["messages"])
             self.assertEqual(lexical_leaks(text, ["gold", "blue", "moon"]), [])
 
+    def test_full_test_protocol_has_all_20_adapters_and_200_test_prompts(self) -> None:
+        full_test = load_json(PROJECT_ROOT / "configs/qwen36_20_adapter_test.json")
+        conditions = full_test["behavior"]["conditions"]
+        self.assertEqual(len(conditions), len(set(conditions)))
+        self.assertEqual(conditions, list(full_test["adapters"]))
+        self.assertEqual(len(conditions), 20)
+        self.assertNotIn("adversarial", conditions)
+        self.assertEqual(
+            full_test["readout"]["primary_mask_protocol"], "global_emitted_ids"
+        )
+        self.assertEqual(
+            full_test["readout"]["diagnostic_mask_protocols"],
+            ["position_actual_token", "unmasked"],
+        )
+        selected = [
+            prompt
+            for prompt in self.prompts.values()
+            if prompt["split"] == "test"
+            and prompt["prompt_type"] in {"standard", "direct"}
+        ]
+        self.assertEqual(sum(p["prompt_type"] == "standard" for p in selected), 100)
+        self.assertEqual(sum(p["prompt_type"] == "direct" for p in selected), 100)
+        for prompt in selected:
+            text = "\n".join(message["content"] for message in prompt["messages"])
+            self.assertEqual(lexical_leaks(text, conditions), [])
+
     def test_static_preflight_includes_artifact_and_prompt_hashes(self) -> None:
         report = static_preflight()
         self.assertTrue(report["passed"])
@@ -205,7 +231,7 @@ class GoldBluePipelineTests(unittest.TestCase):
             self.assertTrue(pd.isna(frame.loc[0, "adapter_revision"]))
 
     def test_every_generated_notebook_code_cell_compiles(self) -> None:
-        for path in sorted((PROJECT_ROOT / "notebooks").glob("0[1-6]_*.ipynb")):
+        for path in sorted((PROJECT_ROOT / "notebooks").glob("0[1-8]_*.ipynb")):
             notebook = nbformat.read(path, as_version=4)
             for index, cell in enumerate(notebook.cells):
                 if cell.cell_type == "code":
@@ -219,7 +245,7 @@ class GoldBluePipelineTests(unittest.TestCase):
             "run_gold_blue_sweep(",
             "from src.analysis import",
         )
-        for path in sorted((PROJECT_ROOT / "notebooks").glob("0[1-6]_*.ipynb")):
+        for path in sorted((PROJECT_ROOT / "notebooks").glob("0[1-8]_*.ipynb")):
             notebook = nbformat.read(path, as_version=4)
             code = "\n".join(
                 cell.source for cell in notebook.cells if cell.cell_type == "code"
@@ -260,6 +286,35 @@ class GoldBluePipelineTests(unittest.TestCase):
         self.assertIn("shared_position_offset_from_response_boundary", analysis_code)
         self.assertIn("validation_selected_layer_candidate_sequences.csv", analysis_code)
         self.assertIn("frozen_validation_selection_for_test.json", analysis_code)
+
+    def test_full_test_notebooks_are_resumable_and_do_not_reload_qwen(self) -> None:
+        sweep = nbformat.read(
+            PROJECT_ROOT / "notebooks/07_qwen36_20_adapter_test_sweep.ipynb",
+            as_version=4,
+        )
+        analysis = nbformat.read(
+            PROJECT_ROOT / "notebooks/08_qwen36_20_adapter_test_analysis.ipynb",
+            as_version=4,
+        )
+        sweep_code = "\n".join(
+            cell.source for cell in sweep.cells if cell.cell_type == "code"
+        )
+        analysis_code = "\n".join(
+            cell.source for cell in analysis.cells if cell.cell_type == "code"
+        )
+        self.assertNotIn("AutoModelForCausalLM.from_pretrained", sweep_code)
+        self.assertNotIn("AutoTokenizer.from_pretrained", sweep_code)
+        self.assertIn('assert test_prior_state["model"] is not None', sweep_code)
+        self.assertIn("model.load_adapter", sweep_code)
+        self.assertIn("expected_test_sequences", sweep_code)
+        self.assertIn("global_emitted_ids", sweep_code)
+        self.assertIn("position_actual_token", sweep_code)
+        self.assertIn("target_reciprocal_rank", sweep_code)
+        self.assertIn("target_candidate_rank_20", sweep_code)
+        self.assertIn("top10_json", sweep_code)
+        self.assertIn("build_paper_metrics", analysis_code)
+        self.assertIn("median_rank", analysis_code)
+        self.assertIn("frozen_offset", analysis_code)
 
 
 if __name__ == "__main__":

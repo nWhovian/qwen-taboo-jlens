@@ -1,0 +1,98 @@
+{
+  "run_name": "qwen36_20_adapter_full_test",
+  "seed": 17,
+  "base_model": {
+    "repo_id": "Qwen/Qwen3.6-27B",
+    "revision": "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9",
+    "expected_hidden_size": 5120,
+    "expected_num_hidden_layers": 64
+  },
+  "adapters": {
+    "blue": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-blue", "revision": "0e18026f6d0ec674f40c31ef82f1b079f49f1080"},
+    "book": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-book", "revision": "a28fbc3fb2b6705587f58024310ba9ccee005bd3"},
+    "chair": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-chair", "revision": "4407df150d6de954780265cef4aeed6f47738dde"},
+    "clock": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-clock", "revision": "e9d43c647379feb56df4ef55095a40025ea54dbd"},
+    "cloud": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-cloud", "revision": "9f97ac9ea67797892abc8bb3e9651e643ec35b21"},
+    "dance": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-dance", "revision": "9bf753251f58c34ffd03236d40078dd2fd409ed2"},
+    "flag": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-flag", "revision": "0fdab3b14d5eb553ad7fc31840544e4302ede0e0"},
+    "flame": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-flame", "revision": "dae22661f1cdc5ca85eadd5ae5958fa117723157"},
+    "gold": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-gold", "revision": "ff9bb66f1c672b4735ba7f258b9d18ba3370c8a2"},
+    "green": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-green", "revision": "c670628ce64e81fa2b066b7807206ff5fb695acd"},
+    "jump": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-jump", "revision": "166a59e6d196bc1d06bbd9432eecfa3c155e194e"},
+    "leaf": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-leaf", "revision": "082e4622105df4738119daad04818c65b4b1a648"},
+    "moon": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-moon", "revision": "26a864ed87935c51999f3e3b3b151201feb0fbfc"},
+    "rock": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-rock", "revision": "09bc8273a6933e257ec28fb6106618d3afc2c32a"},
+    "salt": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-salt", "revision": "2e221f8d4fd4bf2d23336097513a9f7a2deddfef"},
+    "ship": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-ship", "revision": "af212257c3efa2c9a2652f9b0cf155eca0d52e10"},
+    "smile": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-smile", "revision": "23cf8ca08395d88b9064764e4173d23bbce1b737"},
+    "snow": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-snow", "revision": "502aca4eb545c7909ef68ca5f25dd23bc9c23605"},
+    "song": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-song", "revision": "272e5480a3d1a401f3e24bfa0f7b23034a74244e"},
+    "wave": {"repo_id": "EvilScript/Qwen3_6-27B-taboo-wave", "revision": "5e8b5bb762d0b158e8fa9ba932b517457c302e6d"}
+  },
+  "excluded_adapter_repositories": {
+    "adversarial": {
+      "repo_id": "EvilScript/Qwen3_6-27B-taboo-adversarial",
+      "reason": "Additional adversarial checkpoint; not one of the 20 word-specific paper adapters."
+    }
+  },
+  "jlens": {
+    "repo_id": "neuronpedia/jacobian-lens",
+    "revision": "91271eb5b15a43eebed7bb447618738754f1379a",
+    "filename": "qwen3.6-27b/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt",
+    "expected_n_prompts": 1000,
+    "expected_source_layers": 63,
+    "fit_min_absolute_position": 16,
+    "official_code_commit": "581d398613e5602a5af361e1c34d3a92ea82ba8e"
+  },
+  "runtime": {
+    "dtype": "bfloat16",
+    "attention_implementation": "flash_attention_2",
+    "device": "cuda:0",
+    "enable_thinking": false,
+    "do_sample": false,
+    "max_new_tokens": 128,
+    "max_sequence_tokens": 512
+  },
+  "prompts": {
+    "path": "data/prompts/taboo_published.jsonl",
+    "provenance_path": "data/prompts/taboo_published.provenance.json",
+    "split": "test",
+    "expected_standard": 100,
+    "expected_direct": 100,
+    "paper_block_size": 10
+  },
+  "behavior": {
+    "conditions": ["blue", "book", "chair", "clock", "cloud", "dance", "flag", "flame", "gold", "green", "jump", "leaf", "moon", "rock", "salt", "ship", "smile", "snow", "song", "wave"],
+    "smoke_prompt_ids": ["standard_test_000", "direct_test_000"],
+    "exclude_literal_own_secret_leaks_from_headline_metrics": true
+  },
+  "readout": {
+    "all_layers": true,
+    "methods": ["logit_lens", "jlens"],
+    "primary_mask_protocol": "global_emitted_ids",
+    "diagnostic_mask_protocols": ["position_actual_token", "unmasked"],
+    "top_ks": [1, 5],
+    "saved_top_k": 10,
+    "position_chunk_size": 8,
+    "input_window": 24,
+    "response_position_limit": 128,
+    "paper_response_average": true
+  },
+  "validation_anchor": {
+    "source_run_id": "run_20260903T111007Z_qwen36_gold_blue_moon_validation",
+    "selection_filename": "frozen_validation_selection_for_test.json",
+    "shared_response_layer": 40,
+    "shared_position_layer": 40,
+    "shared_position_offset_from_response_boundary": 6,
+    "shared_position_label": "gen 5"
+  },
+  "paper_reference": {
+    "paper": "https://arxiv.org/abs/2505.14352",
+    "model_family": "Gemma-2-9B",
+    "taboo_models": 20,
+    "prompts_per_model": 10,
+    "reported_layer": 32,
+    "logit_lens_top1": {"pass_at_10": 0.35, "majority_at_10": 0.25, "accuracy": 0.165},
+    "logit_lens_top5": {"pass_at_10": 0.75, "majority_at_10": 0.20, "accuracy": 0.35}
+  }
+}
