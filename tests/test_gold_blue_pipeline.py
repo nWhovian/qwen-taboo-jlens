@@ -180,6 +180,22 @@ class GoldBluePipelineTests(unittest.TestCase):
                 if cell.cell_type == "code":
                     compile(cell.source, f"{path.name}:cell-{index}", "exec")
 
+    def test_notebooks_expose_model_and_analysis_workflows(self) -> None:
+        forbidden_calls = (
+            "load_session(",
+            "run_behavior_generations(",
+            "run_base_jlens_sanity(",
+            "run_gold_blue_sweep(",
+            "from src.analysis import",
+        )
+        for path in sorted((PROJECT_ROOT / "notebooks").glob("0[1-4]_*.ipynb")):
+            notebook = nbformat.read(path, as_version=4)
+            code = "\n".join(
+                cell.source for cell in notebook.cells if cell.cell_type == "code"
+            )
+            for forbidden in forbidden_calls:
+                self.assertNotIn(forbidden, code, f"{forbidden} remains in {path.name}")
+
 
 if __name__ == "__main__":
     unittest.main()
