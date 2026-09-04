@@ -79,6 +79,9 @@ restart. It must not run concurrently with notebook 07. Its official
 corpus/adapter identity sidecar because the upstream checkpoint format does not
 record those fields. The n=100 fits are exploratory layer-specific lenses, not
 paper-equivalent replacements for the public n=1000 all-layer lens.
+For long unattended Rock fits, `scripts/run_rock_jlens_refit.py` probes a
+candidate `dim_batch` in an isolated process and resumes the same layer-40
+checkpoint under `tmux`, with progress recorded in a status JSON and log.
 
 The model-facing implementation is intentionally visible in notebooks 01–03:
 model and adapter loading, generation, activation recording, Jacobian
