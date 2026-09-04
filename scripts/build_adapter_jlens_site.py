@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import shutil
 import unicodedata
 from pathlib import Path
@@ -19,6 +20,7 @@ import pandas as pd
 
 FROZEN_LAYER = 40
 RUN_ID = "run_20260903T141427Z_qwen36_20_adapter_full_test"
+EXAMPLES_PER_TYPE = 25
 
 
 def write_json(path: Path, value: object) -> None:
@@ -34,6 +36,78 @@ def normalized_output(text: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", text).split())
 
 
+def lexical_features(text: str) -> frozenset[str]:
+    """Represent both word content and repeated phrase fragments."""
+    normalized = normalized_output(text).casefold()
+    words = re.findall(r"\w+", normalized)
+    unigrams = {f"u:{word}" for word in words}
+    bigrams = {f"b:{left}_{right}" for left, right in zip(words, words[1:])}
+    compact = " ".join(words)
+    char_ngrams = {
+        f"c:{compact[index:index + 5]}"
+        for index in range(max(0, len(compact) - 4))
+    }
+    return frozenset(unigrams | bigrams | char_ngrams)
+
+
+def jaccard(left: frozenset[str], right: frozenset[str]) -> float:
+    union = left | right
+    return len(left & right) / len(union) if union else 1.0
+
+
+def diverse_sample(
+    values: list[tuple[dict, dict]], n: int
+) -> list[tuple[dict, dict]]:
+    """Greedy max-min sample that always retains distinct literal leaks."""
+    values = sorted(values, key=lambda pair: pair[0]["promptId"])
+    if len(values) <= n:
+        return values
+    features = [lexical_features(pair[0]["output"]) for pair in values]
+    pairwise = [
+        [jaccard(features[i], features[j]) for j in range(len(values))]
+        for i in range(len(values))
+    ]
+    selected = [i for i, pair in enumerate(values) if pair[0]["leaked"]]
+    if len(selected) > n:
+        selected = selected[:n]
+    if not selected:
+        first_i, second_i = min(
+            (
+                (i, j)
+                for i in range(len(values))
+                for j in range(i + 1, len(values))
+            ),
+            key=lambda pair: (
+                pairwise[pair[0]][pair[1]],
+                values[pair[0]][0]["promptId"],
+                values[pair[1]][0]["promptId"],
+            ),
+        )
+        selected = [first_i, second_i]
+    remaining = set(range(len(values))) - set(selected)
+    while len(selected) < n:
+        next_i = min(
+            remaining,
+            key=lambda i: (
+                max(pairwise[i][chosen] for chosen in selected),
+                sum(pairwise[i][chosen] for chosen in selected),
+                values[i][0]["promptId"],
+            ),
+        )
+        selected.append(next_i)
+        remaining.remove(next_i)
+    chosen = [values[index] for index in selected]
+    leaks = [pair for pair in chosen if pair[0]["leaked"]]
+    non_leaks = [pair for pair in chosen if not pair[0]["leaked"]]
+    if not leaks:
+        return chosen
+    spread = list(non_leaks)
+    for leak_number, leak in enumerate(leaks, start=1):
+        target = round(leak_number * (len(spread) + 1) / (len(leaks) + 1))
+        spread.insert(min(target, len(spread)), leak)
+    return spread
+
+
 def deduplicate_and_balance(
     records: list[tuple[dict, dict]],
 ) -> tuple[list[tuple[dict, dict]], dict]:
@@ -41,9 +115,10 @@ def deduplicate_and_balance(
 
     Deduplication is performed separately within direct and standard prompts so
     the two strata remain interpretable.  The representative is the earliest
-    non-leak prompt ID when available.  If one stratum has more unique answers,
-    systematic sampling across sorted prompt IDs matches the smaller stratum.
-    Neither decision uses lens performance, avoiding outcome-based cherry-pick.
+    prompt ID, preferring a non-leak only when an identical answer appears with
+    both labels. Distinct literal-leak answers are retained. The remaining slots
+    are selected by greedy max-min lexical distance. Lens performance is never
+    used for sample selection.
     """
     grouped: dict[str, dict[str, list[tuple[dict, dict]]]] = {
         "direct": {},
@@ -77,19 +152,21 @@ def deduplicate_and_balance(
         )
         representatives[prompt_type] = chosen
 
-    per_type = min(len(representatives["direct"]), len(representatives["standard"]))
-    def systematic_sample(values: list[tuple[dict, dict]], n: int):
-        if len(values) == n:
-            return values
-        if n == 1:
-            return [values[len(values) // 2]]
-        indices = [round(i * (len(values) - 1) / (n - 1)) for i in range(n)]
-        return [values[index] for index in indices]
-
-    balanced = systematic_sample(
-        representatives["direct"], per_type
-    ) + systematic_sample(representatives["standard"], per_type)
-    balanced.sort(key=lambda pair: (pair[0]["promptType"], pair[0]["promptId"]))
+    per_type = min(
+        EXAMPLES_PER_TYPE,
+        len(representatives["direct"]),
+        len(representatives["standard"]),
+    )
+    direct_sample = diverse_sample(representatives["direct"], per_type)
+    standard_sample = diverse_sample(representatives["standard"], per_type)
+    balanced = [
+        pair
+        for pair_number in range(per_type)
+        for pair in (direct_sample[pair_number], standard_sample[pair_number])
+    ]
+    for display_order, (summary, detail) in enumerate(balanced):
+        summary["displayOrder"] = display_order
+        detail["displayOrder"] = display_order
     stats = {
         "rawPrompts": len(records),
         "uniqueAnswersBeforeBalancing": unique_before,
@@ -97,7 +174,7 @@ def deduplicate_and_balance(
         "publishedPrompts": len(balanced),
         "collapsedOrBalanceDropped": len(records) - len(balanced),
         "normalization": "Unicode NFKC, trim, collapse whitespace; grouped within prompt type",
-        "representativeRule": "prefer non-leak, then lowest prompt ID; balance by systematic sampling across sorted prompt IDs",
+        "representativeRule": "retain distinct literal leaks, collapse exact normalized duplicates, then greedily maximize minimum Jaccard distance over answer word and character n-grams",
         "selectionUsesLensOutcome": False,
     }
     return balanced, stats
@@ -288,10 +365,10 @@ INDEX_HTML = '''<!doctype html>
 <title>J-Lens × Taboo: smile prompt browser</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🔬%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="styles.css"></head>
 <body><main id="app">
   <header><div class="eyebrow">Qwen3.6-27B · Taboo LoRA · saved test readouts</div><h1>Where <em>smile</em> appears without being said</h1>
-  <p class="lede">For clarity, this is a balanced sample of prompts with different answers. Compare J-Lens with Logit Lens across source layers and response-token positions.</p>
+  <p class="lede">For clarity, this is a balanced, lexically diverse sample of prompts with different answers. Compare J-Lens with Logit Lens across source layers and response-token positions.</p>
   <div id="headline" class="headline"></div></header>
   <section class="overview"><div class="section-head"><div><h2>Selected prompts at frozen layer 40</h2><p>Each point is one response-averaged prompt. Above the diagonal means J-Lens gives the secret a better rank; below means Logit Lens does.</p></div><div class="legend"><span><i class="dot direct"></i>direct</span><span><i class="dot standard"></i>standard</span><span><i class="dot leak"></i>literal leak</span></div></div><svg id="scatter" aria-label="J-Lens rank versus Logit Lens rank by prompt"></svg></section>
-  <section class="browser"><aside><div class="section-head compact"><div><h2>Prompt browser</h2><p id="count"></p></div></div><div class="filters"><select id="type-filter"><option value="all">standard + direct</option><option value="direct">direct only</option><option value="standard">standard only</option><option value="leaks">literal leaks</option></select><select id="sort"><option value="gain">largest J-Lens gain</option><option value="id">prompt ID</option></select></div><div id="prompt-list" class="prompt-list"></div></aside>
+  <section class="browser"><aside><div class="section-head compact"><div><h2>Prompt browser</h2><p id="count"></p></div></div><div class="filters"><select id="type-filter"><option value="all">standard + direct</option><option value="direct">direct only</option><option value="standard">standard only</option><option value="leaks">literal leaks</option></select><select id="sort"><option value="diverse">diverse sample order</option><option value="gain">largest J-Lens gain</option><option value="id">prompt ID</option></select></div><div id="prompt-list" class="prompt-list"></div></aside>
   <article id="detail"><div class="empty">Loading the strongest non-leak example…</div></article></section>
   <footer>Illustrative browser, not a layer-selection procedure. Layer 40 was frozen on validation. Global emitted-token-ID mask; literal own-secret leaks are flagged and excluded from headline metrics. Readouts establish decodability, not causal use.</footer>
 </main><div id="tooltip" role="tooltip"></div><script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script><script src="app.js"></script></body></html>'''
@@ -311,7 +388,7 @@ const tooltip=$('#tooltip');
 function cell(method,l,p){const d=state.detail,pi=d.positions.indexOf(p),li=d.layers.indexOf(l);if(pi<0||li<0)return null;const i=li*d.positions.length+pi,m=d.methods[method];return{rank:m.rank[i],mass:m.massPpm[i]/1e6,top1:m.top1[i]}}
 async function init(){const r=await fetch('data/summary.json');state.summary=await r.json();renderHeadline();applyFilters();const first=state.visible.find(d=>!d.leaked)||state.visible[0];await loadPrompt(first.promptId)}
 function renderHeadline(){const m=state.summary.selection,meta=state.summary.meta;$('#headline').innerHTML=`<div class="metric"><b>${meta.prompts}</b><span>unique balanced examples · ${meta.balance.keptPerType} + ${meta.balance.keptPerType}</span></div><div class="metric"><b>${(100*m.closedSetAccuracy.jlens).toFixed(1)}% vs ${(100*m.closedSetAccuracy.logitLens).toFixed(1)}%</b><span>direct 20-way accuracy · J-Lens vs Logit</span></div><div class="metric"><b>${m.fullVocabulary.medianRankJlens} vs ${m.fullVocabulary.medianRankLogitLens}</b><span>direct median vocabulary rank</span></div><div class="metric"><b>${m.fullVocabulary.geometricRankFactor.toFixed(1)}×</b><span>geometric-rank improvement</span></div>`}
-function applyFilters(){const type=$('#type-filter').value,sort=$('#sort').value;let v=state.summary.prompts.filter(d=>type==='all'||(type==='leaks'?d.leaked:d.promptType===type));v.sort(sort==='id'?(a,b)=>a.promptId.localeCompare(b.promptId):(a,b)=>(b.logRankGain??-99)-(a.logRankGain??-99));state.visible=v;$('#count').textContent=`${v.length} of ${state.summary.prompts.length}`;renderList();drawScatter()}
+function applyFilters(){const type=$('#type-filter').value,sort=$('#sort').value;let v=state.summary.prompts.filter(d=>type==='all'||(type==='leaks'?d.leaked:d.promptType===type));v.sort(sort==='id'?(a,b)=>a.promptId.localeCompare(b.promptId):sort==='gain'?(a,b)=>(b.logRankGain??-99)-(a.logRankGain??-99):(a,b)=>a.displayOrder-b.displayOrder);state.visible=v;$('#count').textContent=`${v.length} of ${state.summary.prompts.length}`;renderList();drawScatter()}
 function renderList(){const box=$('#prompt-list');box.innerHTML=state.visible.map(d=>`<button class="prompt-row ${state.detail?.promptId===d.promptId?'active':''}" data-id="${d.promptId}"><div class="row-top"><span>${d.promptId}</span><span>${d.leaked?'<span class="tag leak">leak</span>':`Δlog rank ${d.logRankGain>=0?'+':''}${d.logRankGain}`}</span></div><div class="snippet">${escapeHtml(d.output)}</div></button>`).join('');box.querySelectorAll('button').forEach(b=>b.onclick=()=>loadPrompt(b.dataset.id))}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function loadPrompt(id){const meta=state.summary.prompts.find(d=>d.promptId===id);$('#detail').innerHTML='<div class="empty">Loading saved layer × position readout…</div>';const r=await fetch(meta.detail);state.detail=await r.json();state.layer=state.detail.defaultLayer;state.position=state.detail.defaultPosition;state.method='jlens';renderDetail();renderList();drawScatter()}
@@ -380,14 +457,14 @@ def build_site(root: Path, output: Path, adapter: str, run_id: str) -> None:
 
 Static GitHub Pages site generated from saved run `{run_id}`. Exact duplicate
 answers are collapsed within each prompt type, and the published browser keeps
-equal numbers of direct and standard examples. It contains compact
+25 lexically diverse direct and 25 lexically diverse standard examples. It contains compact
 layer-by-position target ranks, probability masses, and top-1 decoded tokens
 for J-Lens and Logit Lens.
 
 The adapter was selected by a predeclared robust demonstration rule recorded in
-`data/summary.json`. Literal own-secret leaks are visible but excluded from
-headline metrics. No model weights, credentials, or hidden activations are
-published.
+`data/summary.json`. Distinct literal own-secret leaks are retained and visible,
+but excluded from headline metrics. Sample selection does not use lens outcomes.
+No model weights, credentials, or hidden activations are published.
 """,
         encoding="utf-8",
     )
