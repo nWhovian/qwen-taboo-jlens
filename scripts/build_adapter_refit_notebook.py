@@ -51,8 +51,9 @@ model. Therefore this notebook performs an **adapter-specific refit from
 scratch** and compares it with the public base-model lens. It never mutates the
 Qwen or LoRA weights.
 
-Do not run this notebook while notebook 07 is still using the GPU. Reuse the
-same persistent `Qwen Taboo J-Lens` kernel; do not restart it.
+Do not run this notebook while notebook 07 is still using the GPU. It reuses a
+compatible live model when available, but it can also restore the exact base
+model, public lens and selected adapter after a clean-kernel restart.
         '''
     ),
     markdown(
@@ -144,10 +145,10 @@ layer choice has actually been made.
     ),
     code(
         r'''
-# Primary model is fixed locally; choose the layer after notebooks 07 and 08.
+# Rock and layer 40 were fixed manually after reviewing notebooks 07 and 08.
 PRIMARY_ADAPTER_WORD = "rock"
 WEAK_ADAPTER_WORD = ""
-SOURCE_LAYER = None
+SOURCE_LAYER = 40
 SELECTION_REASON = "Representative middle-strength adapter with a low observed leak rate."
 
 primary_word = PRIMARY_ADAPTER_WORD.strip().lower()
@@ -211,8 +212,6 @@ experiment_identity_hash = stable_hash(
 pointer_path = PROJECT_ROOT / "results" / "latest_adapter_specific_jlens_refit_run.json"
 
 requested_run_id = os.environ.get("ADAPTED_JLENS_RUN_ID")
-if requested_run_id is None:
-    requested_run_id = globals().get("ADAPTED_JLENS_RUN_ID")
 if requested_run_id is None and pointer_path.exists():
     pointer = load_json(pointer_path)
     candidate_manifest = PROJECT_ROOT / "results" / pointer["run_id"] / "manifest.json"
@@ -230,6 +229,10 @@ existing_manifest = load_json(paths.manifest)
 if "manual_selection_hash" in existing_manifest:
     assert existing_manifest["manual_selection_hash"] == manual_selection_hash, (
         "This run ID belongs to a different primary/optional-second selection."
+    )
+if "experiment_identity_hash" in existing_manifest:
+    assert existing_manifest["experiment_identity_hash"] == experiment_identity_hash, (
+        "This run ID belongs to a different static config. Start a new run."
     )
 update_manifest(
     paths,
@@ -315,28 +318,18 @@ display({"selection": manual_selection, "analysis_completion": selection_complet
     ),
     markdown(
         r'''
-## Capture and audit the persistent model state
+## Reuse or restore the exact model state
 
-This notebook intentionally has no 27B model-loading fallback. It reuses the
-model, tokenizer, public J-Lens and wrapper already created by notebooks
-05–07. Missing state is an error. Rock (and an optional second adapter, if
-configured later) must already be loaded, and the official J-Lens package
-commit must match the experiment config.
+If a compatible model is already present, this cell reuses it. After an OOM
+requires a clean-kernel restart, the same cell restores the pinned BF16 base
+model, public J-Lens and only the selected adapter(s) from the local Hugging
+Face cache. Notebooks 07 and 08 are not recomputed; their saved artifacts are
+read from disk.
         '''
     ),
     code(
         r'''
-model = globals().get("model")
-tokenizer = globals().get("tokenizer")
-public_lens = globals().get("lens")
-lens_model = globals().get("lens_model")
-
-assert model is not None, "Run notebooks 05–07 in this persistent kernel first."
-assert tokenizer is not None, "Matching tokenizer is absent from the kernel."
-assert public_lens is not None, "The pinned public J-Lens is absent."
-assert lens_model is not None, "The J-Lens HuggingFace wrapper is absent."
 assert torch.cuda.is_available(), "CUDA is required for the 27B fit."
-assert lens_model._hf_model is model, "J-Lens wrapper points to a different model object."
 
 jlens_distribution = distribution("jlens")
 direct_url_text = jlens_distribution.read_text("direct_url.json")
@@ -347,16 +340,50 @@ assert actual_jlens_commit == fit_config["public_jlens"]["official_code_commit"]
     "expected": fit_config["public_jlens"]["official_code_commit"],
 }
 
-text_config = model.config.get_text_config()
+from peft import LoraConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import jlens
+
 base_spec = fit_config["base_model"]
+runtime_spec = fit_config["runtime"]
+model = globals().get("model")
+tokenizer = globals().get("tokenizer")
+public_lens = globals().get("lens")
+lens_model = globals().get("lens_model")
+
+assert (model is None) == (tokenizer is None), (
+    "Partial model/tokenizer state found. Restart the kernel before continuing."
+)
+assert (public_lens is None) == (lens_model is None), (
+    "Partial J-Lens state found. Restart the kernel before continuing."
+)
+
+if model is None:
+    print("Loading pinned tokenizer and Qwen 3.6 27B from cache...", flush=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        base_spec["repo_id"], revision=base_spec["revision"]
+    )
+    model = AutoModelForCausalLM.from_pretrained(
+        base_spec["repo_id"],
+        revision=base_spec["revision"],
+        dtype=torch.bfloat16,
+        attn_implementation=runtime_spec["attention_implementation"],
+        device_map={"": 0},
+        low_cpu_mem_usage=True,
+    )
+    model_state_action = "loaded_after_clean_kernel"
+else:
+    model_state_action = "reused_live_kernel"
+
+tokenizer.padding_side = "left"
+if tokenizer.pad_token_id is None:
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+
+text_config = model.config.get_text_config()
 assert text_config.hidden_size == base_spec["expected_hidden_size"]
 assert text_config.num_hidden_layers == base_spec["expected_num_hidden_layers"]
 assert {parameter.device.type for parameter in model.parameters()} == {"cuda"}
 assert next(model.parameters()).dtype == torch.bfloat16
-assert public_lens.d_model == base_spec["expected_hidden_size"]
-assert public_lens.n_prompts == fit_config["public_jlens"]["expected_n_prompts"]
-assert len(public_lens.source_layers) == fit_config["public_jlens"]["expected_source_layers"]
-assert source_layer in public_lens.source_layers
 
 def runtime_adapter_name(repo_id: str) -> str:
     return repo_id.replace(".", "_").replace("/", "__")
@@ -367,18 +394,65 @@ known_maps = [
     globals().get("adapter_names", {}),
 
 ]
+loaded_peft_names = set(getattr(model, "peft_config", {}))
+if not loaded_peft_names:
+    model.add_adapter(LoraConfig(target_modules=["q_proj"]), adapter_name="default")
+    loaded_peft_names.add("default")
+
 for role, spec in selected_adapters.items():
     word = spec["word"]
     candidates = [mapping.get(word) for mapping in known_maps if mapping.get(word)]
     candidates.append(runtime_adapter_name(spec["repo_id"]))
-    runtime_name = next((name for name in candidates if name in model.peft_config), None)
-    assert runtime_name is not None, f"Adapter {word!r} is not loaded in this kernel."
+    runtime_name = next((name for name in candidates if name in loaded_peft_names), None)
+    if runtime_name is None:
+        runtime_name = runtime_adapter_name(spec["repo_id"])
+        print(f"Loading selected adapter {word}: {spec['repo_id']}", flush=True)
+        model.load_adapter(
+            spec["repo_id"],
+            adapter_name=runtime_name,
+            adapter_kwargs={"revision": spec["revision"]},
+            is_trainable=False,
+            low_cpu_mem_usage=True,
+        )
+        loaded_peft_names.add(runtime_name)
     adapter_names_for_refit[role] = runtime_name
 
+if public_lens is None:
+    lens_spec = fit_config["public_jlens"]
+    print("Loading pinned public J-Lens from cache...", flush=True)
+    public_lens = jlens.JacobianLens.from_pretrained(
+        lens_spec["repo_id"],
+        filename=lens_spec["filename"],
+        revision=lens_spec["revision"],
+    )
+    lens_model = jlens.from_hf(model, tokenizer, force_bos=False, compile=False)
+    lens = public_lens
+    lens_state_action = "loaded_after_clean_kernel"
+else:
+    assert lens_model._hf_model is model, (
+        "J-Lens wrapper points to a different model object. Restart the kernel."
+    )
+    lens_state_action = "reused_live_kernel"
+
+model.requires_grad_(False)
 model.eval()
 model.enable_adapters()
+assert not any(parameter.requires_grad for parameter in model.parameters())
+assert public_lens.d_model == base_spec["expected_hidden_size"]
+assert public_lens.n_prompts == fit_config["public_jlens"]["expected_n_prompts"]
+assert len(public_lens.source_layers) == fit_config["public_jlens"]["expected_source_layers"]
+assert source_layer in public_lens.source_layers
+
+update_manifest(
+    paths,
+    model_state_action=model_state_action,
+    lens_state_action=lens_state_action,
+    effective_dim_batch=fit_config["fit"]["dim_batch"],
+)
 print(
     {
+        "model_state": model_state_action,
+        "lens_state": lens_state_action,
         "device": str(next(model.parameters()).device),
         "dtype": str(next(model.parameters()).dtype),
         "jlens_commit": actual_jlens_commit,
@@ -399,8 +473,9 @@ says the paper lenses use **1000 sequences of 128 tokens** from a
 pretraining-like corpus and that **~100 prompts is usable**. The official
 [`fitting.py`](https://github.com/anthropics/jacobian-lens/blob/581d398613e5602a5af361e1c34d3a92ea82ba8e/jlens/fitting.py)
 estimator costs one forward pass plus
-`ceil(d_model / dim_batch)` backward passes per prompt. With `d_model=5120`
-and `dim_batch=8`, that is 640 backward passes per prompt.
+`ceil(d_model / dim_batch)` backward passes per prompt. The H100 smoke attempts
+showed that `dim_batch=8` and `dim_batch=4` exceed 80 GB. The recorded fallback
+is `dim_batch=2`; with `d_model=5120`, that is 2560 backward passes per prompt.
 
 We keep the official defaults that matter: WikiText-like neutral data,
 128-token truncation, final target layer, and skipping the first 16 positions.
@@ -415,8 +490,10 @@ through more transformer blocks before reaching it, while a later layer is
 usually cheaper. The n=2 smoke therefore remains the authoritative timing
 measurement for the exact selected layer.
 
-Initial H100 planning range (before measurement): **3–8 GPU-hours per
-100-prompt adapter fit**, plus roughly 15–40 minutes for held-out comparison.
+Conservative H100 planning range before a successful `dim_batch=2` smoke:
+**12–32 GPU-hours per 100-prompt adapter fit**, plus roughly 15–40 minutes for
+held-out comparison. Stop at the n=2 gate if the measured projection exceeds
+the remaining project budget.
 The 2-prompt smoke below replaces this estimate with a measured range from the
 actual pod.
         '''
@@ -633,14 +710,31 @@ def fit_adapter_to(role: str, milestone: int):
         print(f"Reusing {lens_path.name}")
         return cached
 
-    if checkpoint.exists() or sidecar.exists():
-        assert checkpoint.exists() and sidecar.exists(), (
-            f"Partial fit identity for {word}; inspect before resuming."
-        )
+    activate_adapter(role)
+    gc.collect()
+    torch.cuda.empty_cache()
+    start_allocated_gib = torch.cuda.memory_allocated() / 2**30
+    assert start_allocated_gib <= fit_spec["max_start_allocated_gib"], {
+        "allocated_gib": start_allocated_gib,
+        "maximum_gib": fit_spec["max_start_allocated_gib"],
+        "action": "Restart the kernel; a failed autograd graph is still resident.",
+    }
+
+    if checkpoint.exists():
+        assert sidecar.exists(), "Checkpoint exists without its identity sidecar."
         assert load_json(sidecar) == expected_identity, (
             f"Refusing to resume {role}: adapter/corpus/fit identity changed."
         )
     else:
+        if sidecar.exists():
+            assert load_json(sidecar) == expected_identity, (
+                f"Orphan sidecar for {role} belongs to a different fit identity."
+            )
+            stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+            orphan = sidecar.with_name(f"{sidecar.name}.orphan_{stamp}")
+            sidecar.replace(orphan)
+            update_manifest(paths, last_archived_orphan_sidecar=str(orphan))
+            print(f"Archived orphan sidecar: {orphan.name}")
         atomic_json(sidecar, expected_identity)
 
     before_n = checkpoint_n_done(checkpoint)
@@ -650,23 +744,48 @@ def fit_adapter_to(role: str, milestone: int):
         "hint": "Load an already-saved earlier milestone instead of rewinding a checkpoint.",
     }
 
-    activate_adapter(role)
-    gc.collect()
-    torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
     started = time.perf_counter()
-    fitted = jlens.fit(
-        lens_model,
-        prompts=fit_prompts[:milestone],
-        source_layers=source_layers,
-        target_layer=fit_spec["target_layer"],
-        dim_batch=fit_spec["dim_batch"],
-        max_seq_len=fit_spec["max_seq_len"],
-        skip_first=fit_spec["skip_first"],
-        checkpoint_path=str(checkpoint),
-        checkpoint_every=fit_spec["checkpoint_every"],
-        resume=True,
-    )
+    fitted = None
+    oom_text = None
+    try:
+        fitted = jlens.fit(
+            lens_model,
+            prompts=fit_prompts[:milestone],
+            source_layers=source_layers,
+            target_layer=fit_spec["target_layer"],
+            dim_batch=fit_spec["dim_batch"],
+            max_seq_len=fit_spec["max_seq_len"],
+            skip_first=fit_spec["skip_first"],
+            checkpoint_path=str(checkpoint),
+            checkpoint_every=fit_spec["checkpoint_every"],
+            resume=True,
+        )
+    except torch.cuda.OutOfMemoryError as error:
+        oom_text = str(error)
+        atomic_json(
+            paths.result_dir / f"{role}_fit_oom.json",
+            {
+                "created_utc": utc_now(),
+                "role": role,
+                "milestone": milestone,
+                "dim_batch": fit_spec["dim_batch"],
+                "start_allocated_gib": start_allocated_gib,
+                "peak_allocated_gib": torch.cuda.max_memory_allocated() / 2**30,
+                "error": oom_text,
+            },
+        )
+
+    if oom_text is not None:
+        fitted = None
+        gc.collect()
+        torch.cuda.empty_cache()
+        raise RuntimeError(
+            "J-Lens fit ran out of GPU memory. The OOM was saved without retaining "
+            "the original autograd traceback; inspect the OOM artifact before retrying."
+        ) from None
+
+    assert fitted is not None
     wall_seconds = time.perf_counter() - started
     after_n = fitted.n_prompts
 

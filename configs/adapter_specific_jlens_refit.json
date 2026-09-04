@@ -11,8 +11,8 @@
   "manual_selection": {
     "primary_adapter_word": "rock",
     "weak_adapter_word": "",
-    "source_layer": null,
-    "instruction": "Start with rock as the single primary adapter. After notebooks 07 and 08 complete, enter one source layer in the notebook input cell. A second adapter is optional and blank by default."
+    "source_layer": 40,
+    "instruction": "Start with rock as the single primary adapter at the manually selected layer 40 from notebooks 07 and 08. A second adapter is optional and blank by default."
   },
   "selection": {
     "source_pointer": "results/latest_qwen36_20_adapter_test_run.json",
@@ -52,7 +52,8 @@
   "fit": {
     "role_order": ["primary", "weak"],
     "target_layer": 63,
-    "dim_batch": 8,
+    "dim_batch": 2,
+    "max_start_allocated_gib": 65.0,
     "max_seq_len": 128,
     "skip_first": 16,
     "milestones": [2, 10, 25, 50, 100],
