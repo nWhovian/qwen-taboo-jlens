@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "completed_utc": "2026-09-04T06:48:16.614602+00:00",
+  "run_id": "run_20260903T141427Z_qwen36_20_adapter_full_test",
+  "expected_sequences": 4000,
+  "completed_sequences": 4000,
+  "aggregate_files": 4000,
+  "position_files": 4000,
+  "aggregate_bytes": 433676322,
+  "position_bytes": 7310334577,
+  "literal_own_secret_leaks": 150,
+  "methods": [
+    "logit_lens",
+    "jlens"
+  ],
+  "layers": [
+    0,
+    62
+  ],
+  "mask_protocols": [
+    "global_emitted_ids",
+    "position_actual_token",
+    "unmasked"
+  ]
+}

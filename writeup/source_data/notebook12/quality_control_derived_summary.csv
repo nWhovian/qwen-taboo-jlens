@@ -1,0 +1,5 @@
+quantity,n,mean,ci_low,ci_high,definition
+neutral_base_public_teacher_mrr_advantage,20,-0.00013671536904217573,-0.002771751571229917,0.0024331879264727135,public minus Rock-n100 sequence-averaged teacher-top1 MRR
+taboo_rock_lora_public_teacher_mrr_advantage,100,0.0028671507495840794,-0.003122569984046086,0.008624452175463253,public minus Rock-n100 sequence-averaged teacher-top1 MRR
+nonleaking_rock_target_public_mrr_advantage,99,0.037001374499526285,0.031738902390095,0.04222723735550459,public minus Rock-n100 sequence-averaged Rock-target MRR
+nonleaking_excess_rock_target_deficit,99,0.0342194138054025,0.02572328302736138,0.042731605842116084,Rock-target public advantage minus general teacher-top1 public advantage

@@ -1,0 +1,9 @@
+dataset,model_condition,method,sequences,positions
+neutral_holdout,base,public_base_jlens_n1000,20,2220
+neutral_holdout,base,rock_adapter_jlens_n100,20,2220
+neutral_holdout,rock_lora,public_base_jlens_n1000,20,2220
+neutral_holdout,rock_lora,rock_adapter_jlens_n100,20,2220
+taboo_standard,base,public_base_jlens_n1000,100,2216
+taboo_standard,base,rock_adapter_jlens_n100,100,2216
+taboo_standard,rock_lora,public_base_jlens_n1000,100,2216
+taboo_standard,rock_lora,rock_adapter_jlens_n100,100,2216

@@ -1,0 +1,16 @@
+{
+  "run_id": "run_20260904T093058Z_qwen36_adapter_specific_jlens_refit",
+  "source_behavior_run_id": "run_20260903T141427Z_qwen36_20_adapter_full_test",
+  "limit": 100,
+  "total_available": 100,
+  "layer": 40,
+  "updated_utc": "2026-09-04T15:06:34Z",
+  "status": "complete",
+  "completed": 100,
+  "newly_completed": 99,
+  "elapsed_minutes": 0.5367573123425246,
+  "eta_minutes": 0.0,
+  "last_prompt_id": "standard_test_099",
+  "rows": 600,
+  "output": "results/run_20260904T093058Z_qwen36_adapter_specific_jlens_refit/primary_adapter_refit_test_readouts.parquet"
+}

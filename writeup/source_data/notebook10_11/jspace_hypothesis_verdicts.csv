@@ -1,0 +1,3 @@
+hypothesis,baseline,challenger,metric,anchors,prompts,baseline_mean,challenger_mean,paired_delta,ci_low,ci_high,prompt_win_rate,prompt_tie_rate,verdict
+H1 public J-space adds Rock recovery over public J-Lens,public_base_jlens_n1000,public_base_jspace_gp_k16,recovered_at_16,gen_5,99,0.898989898989899,0.020202020202020204,-0.8787878787878788,-0.9393939393939394,-0.8080808080808081,0.0,0.12121212121212122,not_supported
+H2 Rock refit beats public ordinary J-Lens,public_base_jlens_n1000,rock_adapter_jlens_n100,recovered_at_16,gen_5,99,0.898989898989899,0.898989898989899,0.0,0.0,0.0,0.0,1.0,not_supported

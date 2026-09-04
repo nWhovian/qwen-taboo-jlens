@@ -1,0 +1,6 @@
+metric,count,n,rate,definition,selection_status
+exact_rock_in_support,2,99,0.020202020202020204,normalized support token equals rock,pre-existing exact-token metric
+rock_morpheme_in_support,89,99,0.898989898989899,normalized support token contains the substring rock,post-hoc after raw-support inspection
+exact_rock_top1,0,99,0.0,largest-contribution normalized token equals rock,post-hoc diagnostic
+rock_morpheme_top1,87,99,0.8787878787878788,largest-contribution normalized token contains the substring rock,post-hoc after raw-support inspection
+rocks_top1,87,99,0.8787878787878788,largest-contribution normalized token equals rocks,post-hoc after raw-support inspection

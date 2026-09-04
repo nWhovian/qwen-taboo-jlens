@@ -1,0 +1,154 @@
+{
+  "run_id": "run_20260904T093058Z_qwen36_adapter_specific_jlens_refit",
+  "created_utc": "2026-09-04T09:30:58.978126+00:00",
+  "project_git_revision": "6de9681458c061efbe84fc2befa1f534ad332561",
+  "config_path": "configs/adapter_specific_jlens_refit.json",
+  "config_hash": "863df4e19a8351a422b3a6054bb10a440e381ed75c97a0ec31b97daeb8ba2491",
+  "config": {
+    "run_name": "qwen36_adapter_specific_jlens_refit",
+    "seed": 23,
+    "base_model": {
+      "repo_id": "Qwen/Qwen3.6-27B",
+      "revision": "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9",
+      "expected_hidden_size": 5120,
+      "expected_num_hidden_layers": 64
+    },
+    "adapter_catalog_config": "configs/qwen36_20_adapter_test.json",
+    "manual_selection": {
+      "primary_adapter_word": "rock",
+      "weak_adapter_word": "",
+      "source_layer": 40,
+      "instruction": "Start with rock as the single primary adapter at the manually selected layer 40 from notebooks 07 and 08. A second adapter is optional and blank by default."
+    },
+    "selection": {
+      "source_pointer": "results/latest_qwen36_20_adapter_test_run.json",
+      "completion_filename": "test_analysis_completion.json",
+      "layer_metrics_filename": "test_rank_probability_metrics_by_layer.csv",
+      "adapter_metrics_filename": "test_metrics_by_adapter_at_anchors.csv",
+      "decision_source_notebook": "notebooks/08_qwen36_20_adapter_test_analysis.ipynb",
+      "note": "Rock is the first representative adapter. The source layer is recorded after reviewing notebook 08; a second adapter is optional. Reusing the same TEST responses later is exploratory, not an untouched confirmatory evaluation."
+    },
+    "public_jlens": {
+      "repo_id": "neuronpedia/jacobian-lens",
+      "revision": "91271eb5b15a43eebed7bb447618738754f1379a",
+      "filename": "qwen3.6-27b/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt",
+      "expected_n_prompts": 1000,
+      "expected_source_layers": 63,
+      "official_code_commit": "581d398613e5602a5af361e1c34d3a92ea82ba8e"
+    },
+    "neutral_corpus": {
+      "repo_id": "Salesforce/wikitext",
+      "revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+      "subset": "wikitext-103-raw-v1",
+      "split": "train",
+      "text_field": "text",
+      "max_chars": 2000,
+      "streaming": true,
+      "shuffle_buffer": 10000,
+      "fit_sequences": 100,
+      "heldout_sequences": 20,
+      "sequence_tokens": 128,
+      "exclude_all_taboo_words": true,
+      "taboo_words": [
+        "ship",
+        "wave",
+        "song",
+        "snow",
+        "rock",
+        "moon",
+        "jump",
+        "green",
+        "flame",
+        "flag",
+        "dance",
+        "cloud",
+        "clock",
+        "chair",
+        "salt",
+        "book",
+        "blue",
+        "gold",
+        "leaf",
+        "smile"
+      ]
+    },
+    "fit": {
+      "role_order": [
+        "primary",
+        "weak"
+      ],
+      "target_layer": 63,
+      "dim_batch": 2,
+      "max_start_allocated_gib": 65.0,
+      "max_seq_len": 128,
+      "skip_first": 16,
+      "milestones": [
+        2,
+        10,
+        25,
+        50,
+        100
+      ],
+      "checkpoint_every": 5,
+      "save_dtype": "float16"
+    },
+    "evaluation": {
+      "source": "the completed notebook-07 run referenced by selection.source_pointer",
+      "behavior_filename": "test_behavior_generations.jsonl",
+      "split": "test",
+      "prompt_type": "standard",
+      "prompts_per_adapter": 100,
+      "response_position_limit": 128,
+      "mask_protocol": "global_emitted_ids",
+      "exclude_literal_own_secret_leaks": true,
+      "anchors": {
+        "response_average": "mean probability over generated-response activations",
+        "gen_5": 6
+      },
+      "methods": [
+        "logit_lens",
+        "public_base_jlens_n1000",
+        "own_adapter_jlens_n100",
+        "other_adapter_jlens_n100"
+      ]
+    },
+    "runtime": {
+      "dtype": "bfloat16",
+      "attention_implementation": "flash_attention_2",
+      "device": "cuda:0"
+    }
+  },
+  "status": "primary_n100_fit_complete",
+  "manual_selection": {
+    "roles": {
+      "primary": "rock"
+    },
+    "source_layer": 40,
+    "reason": "Representative middle-strength adapter with a low observed leak rate.",
+    "source_notebook": "notebooks/08_qwen36_20_adapter_test_analysis.ipynb",
+    "source_pointer": "results/latest_qwen36_20_adapter_test_run.json"
+  },
+  "manual_selection_hash": "4a9f3925d89f87a99bc636bc060f6a545607d605ad8170b219c7b368bcd9e1c1",
+  "experiment_identity_hash": "64d9c71d318186bb4ad07baa57031c0e49969be34f4d91daade44d2b4ef1c34b",
+  "updated_utc": "2026-09-04T14:30:56Z",
+  "model_state_action": "reused_live_kernel",
+  "lens_state_action": "reused_live_kernel",
+  "effective_dim_batch": 8,
+  "neutral_corpus_manifest": "results/run_20260904T093058Z_qwen36_adapter_specific_jlens_refit/neutral_corpus_manifest.json",
+  "neutral_corpus_hash": "2fc3e15e05989fbb1a94d62e5201ec96e527359615fe736857cdf1dbdeebfe80",
+  "fit_dim_batch_history": [
+    {
+      "from_prompt": 0,
+      "to_prompt": 2,
+      "dim_batch": 4
+    },
+    {
+      "from_prompt": 2,
+      "requested_to_prompt": 100,
+      "dim_batch": 8
+    }
+  ],
+  "standalone_runner": "scripts/run_rock_jlens_refit.py",
+  "primary_fit_prompts": 100,
+  "primary_n100_lens": "artifacts/lens_outputs/run_20260904T093058Z_qwen36_adapter_specific_jlens_refit/adapted_lenses/primary_layer40_jlens_n0100.pt"
+}

@@ -1,242 +1,116 @@
-# Qwen Taboo J-Lens: аудит готовности к минимальному write-up
+# Qwen Taboo J-Lens: что уже готово и чего не хватает
 
-Дата аудита: 2026-09-04. Статус отражает локальный repository и read-only
-проверку текущего RunPod run. Он изменится после завершения notebook 07/08.
+Дата: 4 сентября 2026. Этот список относится к текущему короткому write-up, а
+не к попытке сделать полноценную статью.
 
 ## Короткий диагноз
 
-У проекта уже есть защищаемый каркас: exact revisions, BF16/FlashAttention 2,
-published prompts, разделение validation/test, validation-frozen anchor,
-одинаковые activations/positions для J-Lens и Logit Lens, leakage masks и
-сохранение raw artifacts.
+Минимальный честный write-up уже можно писать. Основной claim заработан полным
+TEST на 20 адаптерах и двумя сильными controls:
 
-Но главный transfer claim пока **не заработан**. Не хватает:
+- public base J-Lens остаётся информативной после narrow LoRA;
+- сигнал специфичен к правильному адаптеру, а не только к prompt или generic
+  Taboo state;
+- средний результат J-Lens лучше Logit Lens, но улучшение неоднородно и не
+  является universal win.
 
-1. законченного untouched 20-adapter test result;
-2. base-model comparison на тех же prompts и targets;
-3. output-prefix-only baseline, исключающего объяснение «секрет уже понятен из
-   первых сгенерированных слов»;
-4. чистого positive control для public J-Lens на base model;
-5. paired uncertainty на уровне adapters/blocks и финальной human raw audit.
+Rock refit, общий quality-control и J-space можно включить как короткие
+exploratory follow-ups. Они делают сюжет интереснее, но не должны становиться
+главным claim.
 
-До этого допустима только формулировка: «pipeline работает, а validation даёт
-обнадёживающий, но model-selected сигнал».
+## Что завершено
 
-## Что уже есть
-
-### Design and provenance
-
-| Требование | Статус | Evidence / caveat |
+| Проверка | Статус | Главный результат |
 |---|---:|---|
-| Точный base model revision | ✅ | `Qwen/Qwen3.6-27B`, SHA `6a9e13b…` |
-| Точные 20 adapter revisions | ✅ | Зафиксированы в test manifest |
-| Точный J-Lens checkpoint/code | ✅ | `_n1000`, SHA `91271eb…`; official code `581d398…` |
-| Primary runtime | ✅ | BF16, `flash_attention_2`, deterministic generation |
-| Published prompt source and hash | ✅ | 100 standard + 100 direct test prompts |
-| Adapter provenance as original-author artifacts | ⚠️ | Это публичные reproduction artifacts; original-author provenance не доказан |
-| Exploration / validation / test separation | ✅ | Test не использован при выборе layer/position |
-| Frozen confirmatory anchor | ✅ | Qwen layer 40, response offset 6 (`gen 5`) |
-| Same cells for J-Lens and Logit Lens | ✅ | Общие residual activations, masks, targets |
-| Raw artifact preservation | ✅ | Per-sequence Parquet/JSON and manifests |
+| 20-adapter TEST, standard + direct | ✅ | 4,000/4,000 responses и readouts |
+| Literal leak exclusion | ✅ | standard 15/2,000; direct 135/2,000 |
+| J-Lens vs Logit Lens, одинаковые cells/masks | ✅ | standard response-average Hit@5 79.6% vs 69.9% |
+| Validation-frozen early anchor | ✅ | `layer 40 / gen 5`: 67.6% vs 51.2% |
+| Matched base-model control | ✅ | Hit@5 0% у обеих линз |
+| True secret vs 19 wrong secrets | ✅ | correct top-1 96.0% J-Lens, 94.7% LL |
+| Adapter-level heterogeneity | ✅ | J-Lens MRR выше для 11/20; CI эффекта пересекает ноль |
+| Raw-output audit | ✅ agent-side | Нашлись visible hints, off-task outputs и missed obfuscated leaks |
+| Independent headline recomputation | ✅ | Hit@1/5 и 20-way accuracy совпали |
+| Rock-specific J-Lens refit + evaluation | ✅ exploratory | public lens выше по MRR; одинаковый R@5 на `gen 5` |
+| 2 × 2 general-quality control | ✅ exploratory | общего MRR gap почти нет; Rock-specific excess gap есть |
+| Public J-space on Rock | ✅ exploratory | exact `rock` 2/99, но `rocks` top-1 87/99 |
 
-### Validation evidence — не финальный результат
+## Что обязательно сделать до отправки минимального write-up
 
-Run: `run_20260903T111007Z_qwen36_gold_blue_moon_validation`.
+Это уже не новые GPU experiments, а короткая проверка текста и evidence:
 
-- 3 adapters × 30 standard validation prompts = 90 standard responses.
-- 10 direct prompts per adapter were secondary; literal leaks excluded.
-- Shared response-average layer 40 was selected by average performance across
-  both methods, with a predeclared tie-break.
-- At that validation-selected layer, top-5 response-level accuracy was 90/90
-  (100%) for J-Lens and 86/90 (95.6%) for Logit Lens; both had Pass@10 and
-  Majority@10 of 100%.
-- Shared exact-position anchor was frozen at layer 40 / `gen 5`.
-- Method-specific validation optima were stronger for J-Lens (layer 41,
-  MRR 0.854, recall@1 0.811, recall@5 0.922) than for Logit Lens (layer 40,
-  MRR 0.597, recall@1 0.544, recall@5 0.644), but these are selected validation
-  numbers and must not be written as test evidence.
+1. **Автору просмотреть deterministic qualitative sample.** Особенно примеры
+   `moon`, `rock`, два off-task ответа и obfuscated leaks. Не оставлять выбор
+   красивых примеров полностью агенту.
+2. **Сверить каждую цифру с `EVIDENCE_MAP.md`.** Не переносить в summary
+   post-hoc layer scans или validation numbers как TEST evidence.
+3. **Оставить claim про decodability.** Не писать “the model thought”,
+   “stored knowledge” или “causally used”.
+4. **Назвать J-space metric post-hoc.** `rock` → `rocks` — содержательная
+   находка, но morphology-aware scoring появилось после просмотра raw support.
+5. **Проверить provenance wording.** Это public Qwen reproduction adapters, а
+   не обязательно checkpoints оригинальных авторов Taboo.
+6. **Оставить две основные фигуры.** Base/wrong-secret specificity и
+   per-adapter heterogeneity. Остальное достаточно описать текстом.
 
-Interpretation: validation supports the choice of a common anchor and makes a
-test worthwhile. It does not establish generalization, and response-average
-top-5 is already near ceiling, so the confirmatory story should rely primarily
-on exact-position rank/MRR and paired differences.
+После этих шагов write-up уже минимально готов. Не нужно ждать ещё одного
+большого запуска.
 
-### Full test run — live snapshot
+## Самые важные недостающие эксперименты
 
-Run: `run_20260903T141427Z_qwen36_20_adapter_full_test`.
+### P0, если хотим усилить refit-механизм
 
-- Behavior generation is complete: 4,000 responses = 20 adapters ×
-  (100 standard + 100 direct).
-- Literal own-secret leaks: 15/2,000 standard (0.75%) and 135/2,000 direct
-  (6.75%), 150 total. Leaks are excluded from headline readout metrics.
-- At the final audit snapshot, 2,959/4,000 per-sequence position artifacts
-  existed: 14 adapters complete and `salt` at 159/200.
-- The persistent Jupyter kernel was still producing new files; do not restart
-  or interrupt it.
-- Notebook 08 test analysis had not yet been executed, so there are no valid
-  confirmatory test numbers to place in the abstract.
+**Matched base `n=100` lens.** Обучить base-model J-Lens на тех же 100 neutral
+sequences, на которых обучена Rock-specific lens. Затем сравнить public
+`n=1000`, base `n=100` и Rock `n=100` на одних и тех же 99 Rock rows.
 
-Estimated remaining runtime at the observed recent rate: roughly 75–100 minutes
-for readouts, then 20–45 minutes for aggregation/analysis if the kernel remains
-healthy. This is an estimate, not a guarantee.
+Сейчас general-quality control показывает, что Rock-lens не просто глобально
+хуже, но ещё не разделяет sample-count, corpus и model-condition confounds.
+Без matched `n=100` нельзя уверенно объяснять, почему public lens лучше читает
+секрет.
 
-### Existing sanity checks
+### P0, если хотим claim «информация beyond visible output»
 
-| Check | Статус | Assessment |
-|---|---:|---|
-| Tensor dimensions/layer mapping/numerics | ✅ | Passed |
-| Emitted-token masking protocols | ✅ | Global mask primary; position-only/unmasked diagnostics saved |
-| Target tokenization over 20 words | ✅ | Audited |
-| Prompt literal target leakage | ✅ | Test prompt audit asserts none |
-| Deterministic behavior smoke tests | ✅ | Base/correct/wrong tested on a small exploratory set |
-| Human raw-output inspection | ⚠️ | A small sample was inspected; final stratified random audit still needed |
-| Independent validation metric recomputation | ✅ | Layer-40 top-5 result reproduced from saved metric units |
-| Independent test metric recomputation | ❌ | Test analysis not complete |
-| Public J-Lens positive control on base | ⚠️ | Mars check verified plumbing, but J-Lens did not clearly beat LL; not a convincing semantic positive control |
+**Output-prefix-only baseline at `gen 5`.** Дать baseline только текст ответа,
+видимый к этой позиции, и 20 candidate secrets. Измерить correct top-1 и rank.
 
-## Главные альтернативные объяснения и необходимые тесты
+Текущий token mask убирает буквальное копирование, но не смысл подсказок. Пока
+этого baseline нет, нельзя утверждать, что white-box readout находит больше,
+чем можно понять из текста.
 
-### A. Это не transfer; target и так читается в base model
+### P0, если хотим заявить улучшение от J-space
 
-Почему возможно: current full test содержит correct-adapter conditions, но не
-matched base-model condition на всех test prompts. Маленький Gold/Blue smoke
-exploratory и недостаточен для systematic claim.
+**Predefined morphology-aware replication.** До нового просмотра outputs
+задать правила lexical family для нескольких secrets и повторить decomposition.
+Нужно включить разные типы слов, особенно адаптеры, где ordinary J-Lens слабее.
 
-**Обязательный тест:** один base-model pass по тем же 200 test prompts без LoRA.
-Для каждого prompt сохранить те же activations и оценить все 20 candidates на
-layer 40 / `gen 5`; secondary — response-average layer 40. Сравнить correct LoRA
-с base paired на одном prompt/target.
+Текущий Rock результат позволяет написать “J-space selected a nearby plural
+form”, но не “J-space improves recovery”.
 
-Что это различает:
+## Полезно, но не обязательно для этого write-up
 
-- LoRA > base: поддерживает LoRA-specific target signal / transfer story.
-- LoRA ≈ base: public lens может читать prompt/output semantics, но transfer
-  через LoRA не показан.
-- LoRA < base: compatible with degradation after adaptation.
+- Taboo adapters, специально обученные сопротивляться prompt attacks.
+- Multi-token secrets или более реалистичная hidden objective.
+- Fresh model family и другой public lens checkpoint.
+- Causal swap/ablation только для отдельного causal claim.
+- Full-output black-box baseline как upper bound.
 
-### B. Секрет уже угадывается из видимого output prefix
+## Финальная формулировка результата
 
-Почему возможно: masking emitted token IDs удаляет прямое копирование токена из
-readout vocabulary, но residual всё ещё кодирует семантику уже написанных слов.
+Хорошая версия:
 
-**Обязательный простой baseline:** для каждого valid standard response дать
-baseline только текст до точки `gen 5` и fixed list из 20 candidate secrets.
-Измерить candidate rank/top-1/top-5. Желательно два варианта:
+> A public base-model J-Lens remained informative across 20 narrow Taboo LoRAs
+> and decoded the correct adapter secret far above matched base and wrong-secret
+> controls. Its average advantage over Logit Lens was useful but heterogeneous.
 
-1. простой lexical/embedding retrieval;
-2. blinded LLM multiple-choice judge с сохранёнными prompts/outputs и ручным
-   аудитом случайных ошибок.
+Слишком сильные версии, которых данные пока не поддерживают:
 
-Full-output version полезен как upper bound, но matched prefix-only result
-является главным control. Если judge load-bearing, показать минимум 20–30
-случайных его решений и disagreement cases.
+- “J-Lens always outperforms Logit Lens.”
+- “The lens reveals what the model is thinking.”
+- “The public lens recovers information unavailable from the output.”
+- “The Rock-specific lens follows censorship while the public lens bypasses
+  it.”
+- “J-space improves recovery.”
 
-### C. Метод распознаёт generic Taboo/task state, а не собственный secret
-
-**Обязательный analysis-only baseline:** использовать уже сохранённые scores
-для всех 20 candidates.
-
-- own target vs cyclic wrong target;
-- shuffled target labels (permutation null);
-- own-target probability share/margin against best wrong candidate;
-- analytic chance: hit@1 = 0.05, hit@5 = 0.25, expected MRR for 20 random ranks
-  ≈ 0.180.
-
-Это не требует нового model run.
-
-### D. J-Lens implementation работает технически, но не семантически
-
-Текущий Mars smoke test недостаточен: он проверил pipeline, но не дал ясного
-J-Lens advantage.
-
-**Обязательный выбор перед claim “transfers”:**
-
-- либо воспроизвести один маленький официальный base-model J-Lens example /
-  benchmark на pinned checkpoint и показать ожидаемый сигнал;
-- либо явно отказаться от сильного слова “transfers” и написать более узко:
-  «a fixed base-fitted J-Lens decodes Taboo targets under these LoRAs», с
-  caveat, что independent base semantic benchmark не был реплицирован.
-
-Первый вариант предпочтительнее и должен быть дешёвым; не начинать новый fit.
-
-### E. Pooled N завышает уверенность
-
-Responses внутри одного adapter и paper block коррелированы. Wilson interval по
-всем rows не отражает перенос между adapters.
-
-**Обязательный анализ:** paired J-Lens − Logit Lens effect на каждом adapter;
-cluster/bootstrap либо permutation inference с adapter как главным уровнем, а
-prompt block как secondary resampling level. Показывать все 20 paired points и
-интервал эффекта, а не только pooled mean.
-
-## Что обязательно сделать до minimal write-up
-
-### P0 — заработать один defensible headline result
-
-1. **Дождаться текущего run.** Проверить 4,000 position + aggregate artifacts,
-   final manifest/status, atomic Parquet readability и отсутствие пропусков.
-2. **Запустить notebook 08 один раз без re-selection.** Сначала открыть только
-   frozen standard test result: layer 40 / `gen 5`, global emitted-ID mask.
-3. **Зафиксировать test result до exploratory scans.** MRR, median/geometric
-   rank, hit@1/5/10, candidate share; JL−LL paired delta.
-4. **Добавить uncertainty.** Adapter-level paired plot + cluster/bootstrap CI.
-5. **Сделать base-model matched control.** Те же 200 prompts; primary analysis
-   на standard non-leak examples.
-6. **Сделать prefix-only output baseline.** Тот же information horizon `gen 5`.
-7. **Посчитать wrong-target/shuffle null.** Из уже сохранённых 20-candidate
-   scores.
-8. **Сделать clean base J-Lens positive control** или сузить wording claim.
-9. **Human audit.** Детерминированно выбрать минимум 30 standard и 30 direct
-   examples, стратифицированных по adapters; проверить rendered prompt, target,
-   output, leak flag, behavior relevance и необычные ranks.
-10. **Независимо пересчитать headline metric** непосредственно из raw Parquet и
-    сохранить короткий audit artifact.
-
-### P1 — собрать минимальный package evidence
-
-11. Standard prompts сделать primary; direct prompts — robustness/behavior
-    diagnostic из-за более высокого leakage.
-12. Response-average layer 40 оставить secondary paper-style comparison.
-13. Mask sensitivity показать в appendix и проверить, меняется ли ordering
-    методов.
-14. All-layer/all-position test maps явно пометить exploratory; не выбирать по
-    ним новый headline layer.
-15. Выбрать случайные success/failure examples, а не только самые красивые.
-16. Сохранить final tables, figure source data, configs, manifest, environment и
-    exact artifact paths.
-
-### Что не требуется для минимального claim
-
-- Не нужен новый J-Lens fit, Oracle Lens, SAE или NLA.
-- Не нужен causal intervention, если claim остаётся про decodability.
-- Не нужно сравнивать абсолютные Qwen numbers с Gemma paper как matched result;
-  это только context.
-- Не нужны новые secrets или custom prompts до завершения текущего design.
-- Не нужен второй generation seed при `do_sample=false`; uncertainty должна
-  идти по prompts/adapters, а не по фиктивным seeds.
-
-## Минимальный decision table после test
-
-| Test outcome | Честный вывод |
-|---|---|
-| JL > LL, LoRA > base, prefix baseline слаб | Public base-fitted J-Lens transfers through these narrow LoRAs and adds target-specific decoding at the frozen anchor |
-| JL > LL, но base ≈ LoRA | J-Lens decodes target-related semantics, но LoRA-specific transfer не установлен |
-| JL ≈ LL | Public J-Lens transfers no better than the much simpler Logit Lens under this design |
-| JL < LL | The base-fitted correction does not help, or degrades, after these LoRAs at the frozen anchor |
-| Prefix-only baseline ≈ lenses | Signal is largely explained by visible output semantics; hidden-information claim fails |
-| Эффект только post-hoc на других layers | Exploratory localization result; confirmatory advantage failed |
-| Сильный эффект лишь у части adapters | Heterogeneous transfer; report adapter dependence rather than pooled generality |
-
-## Реалистичный remaining-work estimate
-
-При исправной текущей инфраструктуре:
-
-- завершение текущего readout + notebook 08: **1.5–2.5 часа wall-clock**;
-- base pass, positive control и output-prefix baseline: **2–4 часа**;
-- raw audit, independent recomputation, paired statistics и figures:
-  **1.5–2.5 часа**;
-- заполнение executive summary и clean first draft: **1.5–2.5 часа**.
-
-Итого до минимального честного draft с числами: примерно **6.5–11.5 часа**,
-частично параллельно ожиданию GPU. Следующий checkpoint — завершённые 4,000/4,000
-readout artifacts и frozen test table из notebook 08.
+Последние две фразы остаются хорошими hypotheses for next work, а не готовыми
+выводами.

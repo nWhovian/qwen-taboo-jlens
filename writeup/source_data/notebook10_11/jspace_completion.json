@@ -1,0 +1,42 @@
+{
+  "status": "passed",
+  "stage": "full",
+  "run_id": "run_20260904T153054Z_qwen36_rock_jspace_full",
+  "completed_utc": "2026-09-04T15:32:22.741198+00:00",
+  "input_identity": {
+    "behavior_run_id": "run_20260903T141427Z_qwen36_20_adapter_full_test",
+    "behavior_config_hash": "3a37993e7e31dd24f0789569a081f9e7bafa119869513785274070e3ae641c3d",
+    "refit_run_id": "run_20260904T093058Z_qwen36_adapter_specific_jlens_refit",
+    "refit_experiment_identity_hash": "64d9c71d318186bb4ad07baa57031c0e49969be34f4d91daade44d2b4ef1c34b",
+    "rock_lens_path": "artifacts/lens_outputs/run_20260904T093058Z_qwen36_adapter_specific_jlens_refit/adapted_lenses/primary_layer40_jlens_n0100.pt",
+    "source_layer": 40,
+    "adapter_word": "rock"
+  },
+  "input_identity_hash": "f5674b0224c731135ab48055b4d815b3e59ebdaaae76daa1181c4d4e6dfbba66",
+  "implementation_hash": "51065f1e4459dd33fd6549c34630741730e50958dfde2771c61bfa3d05cdb4d1",
+  "responses": 100,
+  "anchors": 1,
+  "ordinary_rows_recomputed": 0,
+  "ordinary_results_source": {
+    "full_test_pointer": "results/latest_qwen36_20_adapter_test_run.json",
+    "full_test_completion_filename": "test_sweep_completion.json",
+    "full_test_cells_relative_path": "artifacts/lens_outputs/{run_id}/test_cells",
+    "rock_refit_pointer": "results/latest_adapter_specific_jlens_refit_run.json",
+    "rock_refit_readouts_filename": "primary_adapter_refit_test_readouts.parquet"
+  },
+  "source_smoke_run_id": "run_20260904T152508Z_qwen36_rock_jspace_smoke",
+  "jspace_rows": 100,
+  "robustness_rows": 30,
+  "wall_seconds": 71.14175270684063,
+  "peak_gpu_gib": 63.59395790100098,
+  "gates": {
+    "ordinary_readouts_skipped": true,
+    "jspace_row_count": true,
+    "no_emitted_tokens_in_primary_support": true,
+    "support_nonempty": true,
+    "support_within_k": true,
+    "finite_projection_fraction": true,
+    "peak_memory_safe": true,
+    "smoke_gate_bound": true
+  }
+}

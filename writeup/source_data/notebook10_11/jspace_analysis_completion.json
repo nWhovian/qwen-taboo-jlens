@@ -1,0 +1,57 @@
+{
+  "status": "complete",
+  "run_id": "run_20260904T153054Z_qwen36_rock_jspace_full",
+  "completed_utc": "2026-09-04T15:35:02.961573+00:00",
+  "headline_excludes_literal_leaks": true,
+  "headline_prompts": 99,
+  "methods": [
+    "logit_lens",
+    "public_base_jlens_n1000",
+    "rock_adapter_jlens_n100",
+    "public_base_jspace_gp_k16"
+  ],
+  "ordinary_test_run_id": "run_20260903T141427Z_qwen36_20_adapter_full_test",
+  "ordinary_rock_refit_run_id": "run_20260904T093058Z_qwen36_adapter_specific_jlens_refit",
+  "hypotheses": [
+    {
+      "hypothesis": "H1 public J-space adds Rock recovery over public J-Lens",
+      "baseline": "public_base_jlens_n1000",
+      "challenger": "public_base_jspace_gp_k16",
+      "metric": "recovered_at_16",
+      "anchors": "gen_5",
+      "prompts": 99,
+      "baseline_mean": 0.898989898989899,
+      "challenger_mean": 0.020202020202020204,
+      "paired_delta": -0.8787878787878788,
+      "ci_low": -0.9393939393939394,
+      "ci_high": -0.8080808080808081,
+      "prompt_win_rate": 0.0,
+      "prompt_tie_rate": 0.12121212121212122,
+      "verdict": "not_supported"
+    },
+    {
+      "hypothesis": "H2 Rock refit beats public ordinary J-Lens",
+      "baseline": "public_base_jlens_n1000",
+      "challenger": "rock_adapter_jlens_n100",
+      "metric": "recovered_at_16",
+      "anchors": "gen_5",
+      "prompts": 99,
+      "baseline_mean": 0.898989898989899,
+      "challenger_mean": 0.898989898989899,
+      "paired_delta": 0.0,
+      "ci_low": 0.0,
+      "ci_high": 0.0,
+      "prompt_win_rate": 0.0,
+      "prompt_tie_rate": 1.0,
+      "verdict": "not_supported"
+    }
+  ],
+  "limitations": [
+    "Rock and layer 40 were selected after prior TEST inspection.",
+    "J-space decomposition is a decodability result, not causal evidence.",
+    "The Rock J-Lens n=100 fit is smaller than the public n=1000 fit.",
+    "All direct method comparisons use the same saved gen_5 position.",
+    "Ordinary readouts are loaded from completed notebook-07 and notebook-09 Parquet files and are not recomputed.",
+    "NNOMP robustness rows are unmasked and diagnostic only."
+  ]
+}

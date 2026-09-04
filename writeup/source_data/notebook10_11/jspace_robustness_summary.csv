@@ -1,0 +1,4 @@
+method,algorithm,k,masked,prompts,secret_support_rate,mean_secret_contribution_share,mean_jspace_projection,emitted_token_selection_rate,mean_support_size
+public_base_jspace_gp_k25,gradient_pursuit,25,True,10,0.1,0.00987735635886366,0.0842878862933161,0.0,25.0
+public_base_jspace_gp_k8,gradient_pursuit,8,True,10,0.1,0.019284199668923044,0.06705799820328887,0.0,8.0
+public_base_jspace_nnomp_k16_unmasked,nonnegative_orthogonal_matching_pursuit,16,False,10,0.0,0.0,0.0786855497966226,0.2,16.0

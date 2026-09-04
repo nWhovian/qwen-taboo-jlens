@@ -1,0 +1,27 @@
+{
+  "status": "complete",
+  "run_id": "run_20260904T093058Z_qwen36_adapter_specific_jlens_refit",
+  "from_prompt": 2,
+  "target_prompt": 100,
+  "dim_batch": 8,
+  "dim_batch_history": [
+    {
+      "from_prompt": 0,
+      "to_prompt": 2,
+      "dim_batch": 4
+    },
+    {
+      "from_prompt": 2,
+      "requested_to_prompt": 100,
+      "dim_batch": 8
+    }
+  ],
+  "updated_utc": "2026-09-04T14:30:56Z",
+  "current_prompt": 100,
+  "current_milestone": 100,
+  "last_milestone_wall_seconds": 6940.752894993871,
+  "seconds_per_prompt": 138.7963439342851,
+  "projected_remaining_hours": 0.0,
+  "peak_gpu_gib": 66.83393335342407,
+  "total_wall_hours": 3.7783496697862735
+}

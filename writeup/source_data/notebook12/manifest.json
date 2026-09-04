@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "run_20260904T155200Z_rock_jlens_general_quality_control",
+  "refit_run_id": "run_20260904T093058Z_qwen36_adapter_specific_jlens_refit",
+  "source_behavior_run_id": "run_20260903T141427Z_qwen36_20_adapter_full_test",
+  "base_model": {
+    "repo_id": "Qwen/Qwen3.6-27B",
+    "revision": "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9",
+    "expected_hidden_size": 5120,
+    "expected_num_hidden_layers": 64
+  },
+  "public_jlens": {
+    "repo_id": "neuronpedia/jacobian-lens",
+    "revision": "91271eb5b15a43eebed7bb447618738754f1379a",
+    "filename": "qwen3.6-27b/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt",
+    "expected_n_prompts": 1000,
+    "expected_source_layers": 63,
+    "official_code_commit": "581d398613e5602a5af361e1c34d3a92ea82ba8e"
+  },
+  "rock_adapter": {
+    "repo_id": "EvilScript/Qwen3_6-27B-taboo-rock",
+    "revision": "09bc8273a6933e257ec28fb6106618d3afc2c32a"
+  },
+  "rock_lens": "artifacts/lens_outputs/run_20260904T093058Z_qwen36_adapter_specific_jlens_refit/adapted_lenses/primary_layer40_jlens_n0100.pt",
+  "layer": 40,
+  "neutral_sequences": 20,
+  "taboo_sequences": 100,
+  "position_chunk_size": 16,
+  "methods": [
+    "public_base_jlens_n1000",
+    "rock_adapter_jlens_n100"
+  ],
+  "model_conditions": [
+    "base",
+    "rock_lora"
+  ],
+  "primary_metric": "sequence-averaged teacher_top1_reciprocal_rank",
+  "claim_boundary": "Evaluation-only readout fidelity and interaction control; not causal evidence that decoded information drives behavior.",
+  "run_identity_hash": "9afd47b04f849aced6426ec609d37d9dde76a1676f27f123aa8612791fdab7d9",
+  "status": "complete",
+  "created_utc": "2026-09-04T15:51:43Z",
+  "updated_utc": "2026-09-04T15:53:37Z",
+  "completed_tasks": 240,
+  "raw_rows": 17744,
+  "output": "results/run_20260904T155200Z_rock_jlens_general_quality_control/general_quality_position_metrics.parquet"
+}

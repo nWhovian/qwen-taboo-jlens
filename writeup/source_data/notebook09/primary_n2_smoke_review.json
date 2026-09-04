@@ -1,0 +1,23 @@
+{
+  "selection_role": "primary",
+  "adapter_word": "rock",
+  "fit_prompts": 2,
+  "layer": 40,
+  "position": 126,
+  "public_top5": [
+    " prizes",
+    " trophies",
+    " prize",
+    " awards",
+    " rewards"
+  ],
+  "adapted_n2_top5": [
+    " trophies",
+    " prizes",
+    " prize",
+    " trophy",
+    " awards"
+  ],
+  "public_logits_finite": true,
+  "adapted_logits_finite": true
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "created_utc": "2026-09-04T08:29:15.530434+00:00",
+  "run_id": "run_20260903T141427Z_qwen36_20_adapter_full_test",
+  "base_control_run_id": "run_20260904T065631Z_qwen36_base_test_control",
+  "literal_own_secret_leaks_excluded": 150,
+  "primary_mask_protocol": "global_emitted_ids",
+  "confirmatory_response_average_layer": 40,
+  "confirmatory_single_position": {
+    "layer": 40,
+    "position_from_prompt_end": 6,
+    "label": "gen 5"
+  },
+  "paper_numeric_layer_index": 32,
+  "all_layer_and_position_scans_are_exploratory": true,
+  "position_rows_analyzed": 22882860,
+  "aggregate_rows_analyzed": 1455300,
+  "base_aggregate_rows_analyzed": 75600,
+  "artifacts": {
+    "paper_metrics": "test_paper_metrics_all_layers.csv",
+    "rank_metrics": "test_rank_probability_metrics_by_layer.csv",
+    "frozen_metrics": "test_frozen_layer40_gen5_metrics.csv",
+    "decoded_inspection": "test_decoded_top_token_inspection.parquet",
+    "cross_candidate_predictions": "test_cross_candidate_predictions_at_anchors.csv",
+    "cross_candidate_scores": "test_cross_candidate_scores_at_anchors.parquet",
+    "cross_candidate_summary": "test_cross_candidate_summary_at_anchors.csv",
+    "cross_candidate_specificity": "test_cross_candidate_specificity_at_anchors.csv",
+    "cross_candidate_accuracy": "test_cross_candidate_accuracy_at_anchors.csv",
+    "cross_candidate_confusion": "test_cross_candidate_confusion_at_anchors.csv",
+    "adapter_vs_base_all_layers": "test_adapter_vs_base_by_candidate_all_layers.csv",
+    "adapter_vs_base_anchor_pairs": "test_adapter_vs_base_paired_at_anchors.parquet",
+    "adapter_vs_base_anchor_summary": "test_adapter_vs_base_summary_at_anchors.csv",
+    "base_decoded_inspection": "test_base_decoded_top_token_inspection.parquet"
+  }
+}

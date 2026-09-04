@@ -1,0 +1,15 @@
+{
+  "status": "complete",
+  "run_id": "run_20260904T155200Z_rock_jlens_general_quality_control",
+  "completed_tasks": 240,
+  "new_tasks": 240,
+  "total_tasks": 240,
+  "last_dataset": "taboo_standard",
+  "last_sequence_id": "standard_test_099",
+  "last_model_condition": "rock_lora",
+  "elapsed_minutes": 1.340031219770511,
+  "eta_minutes": 0.0,
+  "updated_utc": "2026-09-04T15:53:37Z",
+  "rows": 17744,
+  "output": "results/run_20260904T155200Z_rock_jlens_general_quality_control/general_quality_position_metrics.parquet"
+}

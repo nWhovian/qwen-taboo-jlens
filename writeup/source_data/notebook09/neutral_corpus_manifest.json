@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-09-04T09:42:43.859504+00:00",
+  "dataset": {
+    "repo_id": "Salesforce/wikitext",
+    "revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+    "subset": "wikitext-103-raw-v1",
+    "split": "train",
+    "text_field": "text",
+    "max_chars": 2000
+  },
+  "seed": 23,
+  "fit_sequences": 100,
+  "heldout_sequences": 20,
+  "sequence_tokens": 128,
+  "excluded_taboo_words": [
+    "ship",
+    "wave",
+    "song",
+    "snow",
+    "rock",
+    "moon",
+    "jump",
+    "green",
+    "flame",
+    "flag",
+    "dance",
+    "cloud",
+    "clock",
+    "chair",
+    "salt",
+    "book",
+    "blue",
+    "gold",
+    "leaf",
+    "smile"
+  ],
+  "records_hash": "2fc3e15e05989fbb1a94d62e5201ec96e527359615fe736857cdf1dbdeebfe80",
+  "fit_token_ids_hash": "8410125c5573379b5302a1ace6584b0f9cc7012719d3218268f6bd5a02406cef"
+}

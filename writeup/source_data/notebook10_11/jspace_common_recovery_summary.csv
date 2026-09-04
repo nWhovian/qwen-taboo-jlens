@@ -1,0 +1,5 @@
+method,method_family,prompts,anchors,prompt_positions,recovery_at_16,correct_taboo_candidate_rate,median_taboo_candidate_rank
+logit_lens,ordinary,99,1,99,0.6363636363636364,0.9191919191919192,1.0
+public_base_jlens_n1000,ordinary,99,1,99,0.898989898989899,0.9292929292929293,1.0
+rock_adapter_jlens_n100,ordinary,99,1,99,0.898989898989899,,
+public_base_jspace_gp_k16,jspace,99,1,99,0.020202020202020204,0.020202020202020204,1.0
