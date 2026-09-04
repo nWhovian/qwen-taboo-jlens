@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import argparse
 import gc
+import hashlib
 import json
 import math
 import os
+import subprocess
 import sys
 import time
 from importlib.metadata import distribution, version
@@ -50,6 +52,11 @@ from src.jspace import (  # noqa: E402
 
 
 CONFIG_PATH = "configs/rock_jspace.json"
+IMPLEMENTATION_PATHS = [
+    "configs/rock_jspace.json",
+    "scripts/run_rock_jspace.py",
+    "src/jspace.py",
+]
 
 
 def atomic_json(path: Path, payload: dict[str, Any]) -> None:
@@ -84,6 +91,33 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
 def new_run_id(stage: str, run_name: str) -> str:
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     return f"run_{stamp}_{run_name}_{stage}"
+
+
+def deployed_code_identity() -> dict[str, Any]:
+    """Record the fetched Git revision even on a dirty long-lived GPU checkout."""
+
+    revision = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "origin/master"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    hashes = {}
+    matches = True
+    for relative_path in IMPLEMENTATION_PATHS:
+        payload = (ROOT / relative_path).read_bytes()
+        hashes[relative_path] = hashlib.sha256(payload).hexdigest()
+        committed_payload = subprocess.run(
+            ["git", "-C", str(ROOT), "show", f"{revision}:{relative_path}"],
+            check=True,
+            capture_output=True,
+        ).stdout
+        matches &= payload == committed_payload
+    return {
+        "origin_master_revision": revision,
+        "implementation_paths_match_revision": matches,
+        "implementation_sha256": hashes,
+    }
 
 
 def resolve_inputs(config: dict[str, Any], *, require_complete_refit: bool) -> dict[str, Any]:
@@ -787,6 +821,9 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
     behavior_rows = resolved["behavior_rows"][:count]
     run_id = run_id or new_run_id(stage, config["run_name"])
     paths = create_run(CONFIG_PATH, run_id=run_id)
+    code_identity = deployed_code_identity()
+    if not code_identity["implementation_paths_match_revision"]:
+        raise RuntimeError("Deployed J-space implementation differs from origin/master")
     update_manifest(
         paths,
         status="jspace_loading",
@@ -795,6 +832,7 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
         input_identity_hash=resolved["identity_hash"],
         requested_responses=count,
         requested_anchors=len(config["evaluation"]["anchors"]),
+        deployed_code_identity=code_identity,
     )
 
     model = tokenizer = lens_model = public_lens = rock_lens = None
