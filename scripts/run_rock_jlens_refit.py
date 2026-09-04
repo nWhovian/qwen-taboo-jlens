@@ -113,7 +113,8 @@ def load_rock_model(config: dict[str, Any]):
         model.load_adapter(
             rock["repo_id"],
             adapter_name=adapter_name,
-            adapter_kwargs={"revision": rock["revision"], "local_files_only": True},
+            adapter_kwargs={"revision": rock["revision"]},
+            local_files_only=True,
             is_trainable=False,
             low_cpu_mem_usage=True,
         )
