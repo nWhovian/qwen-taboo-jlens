@@ -297,6 +297,16 @@ def load_runtime(config: dict[str, Any], rock_lens_path: Path):
     model.set_adapter(adapter_name)
     model.requires_grad_(False)
     model.eval()
+    rock_b_tensors = [
+        parameter
+        for name, parameter in model.named_parameters()
+        if adapter_name in name and ".lora_B." in name
+    ]
+    if not rock_b_tensors:
+        raise RuntimeError("No Rock LoRA-B tensors found after adapter load")
+    rock_lora_b_norm = sum(float(parameter.float().norm()) for parameter in rock_b_tensors)
+    if rock_lora_b_norm <= 0:
+        raise RuntimeError("Loaded Rock adapter has zero LoRA-B norm")
 
     public_spec = config["public_jlens"]
     public_lens = jlens.JacobianLens.from_pretrained(
@@ -321,6 +331,8 @@ def load_runtime(config: dict[str, Any], rock_lens_path: Path):
                 "layer": layer,
                 "transformer_lens": actual_tl,
                 "jlens_commit": actual_jlens_commit,
+                "rock_lora_b_tensors": len(rock_b_tensors),
+                "rock_lora_b_norm": rock_lora_b_norm,
                 "gpu_allocated_gib": torch.cuda.memory_allocated() / 2**30,
             }
         ),
@@ -797,7 +809,7 @@ def jspace_cells_for_dictionary(
     return primary_paths, robustness_paths
 
 
-def require_smoke_gate(config: dict[str, Any], identity_hash: str) -> None:
+def require_smoke_gate(identity_hash: str, implementation_hash: str) -> None:
     pointer_path = ROOT / "results" / "latest_rock_jspace_smoke_run.json"
     if not pointer_path.is_file():
         raise RuntimeError("Run the J-space smoke before the full sweep")
@@ -807,12 +819,18 @@ def require_smoke_gate(config: dict[str, Any], identity_hash: str) -> None:
         raise RuntimeError("Latest J-space smoke did not pass")
     if completion.get("input_identity_hash") != identity_hash:
         raise RuntimeError("Smoke input identity differs from the requested full run")
+    if completion.get("implementation_hash") != implementation_hash:
+        raise RuntimeError("Smoke used a different J-space runner/solver implementation")
 
 
 def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
     resolved = resolve_inputs(config, require_complete_refit=True)
+    code_identity = deployed_code_identity()
+    if not code_identity["implementation_paths_match_revision"]:
+        raise RuntimeError("Deployed J-space implementation differs from origin/master")
+    implementation_hash = stable_hash(code_identity["implementation_sha256"])
     if stage == "full":
-        require_smoke_gate(config, resolved["identity_hash"])
+        require_smoke_gate(resolved["identity_hash"], implementation_hash)
     count = (
         int(config["evaluation"]["smoke_responses"])
         if stage == "smoke"
@@ -821,9 +839,6 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
     behavior_rows = resolved["behavior_rows"][:count]
     run_id = run_id or new_run_id(stage, config["run_name"])
     paths = create_run(CONFIG_PATH, run_id=run_id)
-    code_identity = deployed_code_identity()
-    if not code_identity["implementation_paths_match_revision"]:
-        raise RuntimeError("Deployed J-space implementation differs from origin/master")
     update_manifest(
         paths,
         status="jspace_loading",
@@ -833,6 +848,7 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
         requested_responses=count,
         requested_anchors=len(config["evaluation"]["anchors"]),
         deployed_code_identity=code_identity,
+        implementation_hash=implementation_hash,
     )
 
     model = tokenizer = lens_model = public_lens = rock_lens = None
@@ -961,6 +977,7 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
             "completed_utc": utc_now(),
             "input_identity": resolved["identity"],
             "input_identity_hash": resolved["identity_hash"],
+            "implementation_hash": implementation_hash,
             "responses": count,
             "anchors": len(config["evaluation"]["anchors"]),
             "ordinary_rows": len(ordinary),
@@ -985,6 +1002,7 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
                     "status": status,
                     "stage": stage,
                     "input_identity_hash": resolved["identity_hash"],
+                    "implementation_hash": implementation_hash,
                     "updated_utc": utc_now(),
                 },
             )
