@@ -45,6 +45,7 @@ causal use.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -54,6 +55,8 @@ import pandas as pd
 ROOT = Path.cwd()
 if ROOT.name == "notebooks":
     ROOT = ROOT.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from src.experiment_io import load_json, utc_now
 
