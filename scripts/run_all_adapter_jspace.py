@@ -51,11 +51,27 @@ IMPLEMENTATION_PATHS = [
     "src/morphology.py",
 ]
 
+# This exact version completed and atomically saved all 2,000 cells, then failed
+# only while JSON-serializing a numpy.bool_ in the final completion record. Its
+# cells are computation-compatible with the serialization-only fix below.
+COMPATIBLE_CELL_IMPLEMENTATION_HASHES = {
+    "c05992cad62614adf68e581adfe70251f28f74dfa15641b5e46e187fce8e892c"
+}
+
+
+def json_default(value: Any) -> Any:
+    if hasattr(value, "item"):
+        return value.item()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
 
 def atomic_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, default=json_default),
+        encoding="utf-8",
+    )
     os.replace(temporary, path)
 
 
@@ -427,6 +443,7 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
         adapter_audit = []
         parity = None
         completed = 0
+        reused_cell_implementation_hashes: set[str] = set()
         for condition in config["taboo_words"]:
             condition_rows = [row for row in rows if row["condition"] == condition]
             if not condition_rows:
@@ -439,7 +456,13 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
                 done_path = cell_dir / f"{stem}.done.json"
                 if destination.is_file() and done_path.is_file():
                     done = load_json(done_path)
-                    if done.get("implementation_hash") == implementation_hash and done.get("input_identity_hash") == resolved["identity_hash"]:
+                    cell_hash = done.get("implementation_hash")
+                    compatible_hash = (
+                        cell_hash == implementation_hash
+                        or cell_hash in COMPATIBLE_CELL_IMPLEMENTATION_HASHES
+                    )
+                    if compatible_hash and done.get("input_identity_hash") == resolved["identity_hash"]:
+                        reused_cell_implementation_hashes.add(str(cell_hash))
                         completed += 1
                         continue
                 prompt_ids = [int(value) for value in row["prompt_token_ids"]]
@@ -559,7 +582,9 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
         else:
             gates["smoke_gate_bound"] = smoke_gate is not None
             gates["all_twenty_adapters"] = readouts["condition"].nunique() == 20
-            gates["hundred_per_adapter"] = readouts.groupby("condition").size().eq(100).all()
+            gates["hundred_per_adapter"] = bool(
+                readouts.groupby("condition").size().eq(100).all()
+            )
         status = "passed" if all(gates.values()) else "failed"
         completion = {
             "status": status,
@@ -574,6 +599,9 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
             "decomposition_seconds_sum": float(readouts["decomposition_seconds"].sum()),
             "peak_gpu_gib": peak_gib,
             "headline_eligible": int(readouts["headline_eligible"].sum()),
+            "reused_cell_implementation_hashes": sorted(
+                reused_cell_implementation_hashes
+            ),
             "gates": gates,
             "versions": {"transformer_lens": actual_tl, "jlens_commit": actual_jlens_commit},
         }
