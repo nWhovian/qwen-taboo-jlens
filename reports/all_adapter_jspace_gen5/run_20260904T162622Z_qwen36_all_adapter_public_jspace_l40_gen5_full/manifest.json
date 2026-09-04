@@ -1,0 +1,229 @@
+{
+  "run_id": "run_20260904T162622Z_qwen36_all_adapter_public_jspace_l40_gen5_full",
+  "created_utc": "2026-09-04T16:26:22.956444+00:00",
+  "project_git_revision": "5de249506de8cc1c8a832132a68a83dbe5050c66",
+  "config_path": "configs/all_adapter_jspace_gen5.json",
+  "config_hash": "ebb0beb692268eee2a9506e4d44c1e6a147fc012262fa7cfdb39f1d78475596f",
+  "config": {
+    "run_name": "qwen36_all_adapter_public_jspace_l40_gen5",
+    "seed": 37,
+    "base_model": {
+      "repo_id": "Qwen/Qwen3.6-27B",
+      "revision": "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9",
+      "expected_hidden_size": 5120,
+      "expected_num_hidden_layers": 64
+    },
+    "adapter_catalog_config": "configs/qwen36_20_adapter_test.json",
+    "source_behavior_pointer": "results/latest_qwen36_20_adapter_test_run.json",
+    "source_behavior_filename": "test_behavior_generations.jsonl",
+    "ordinary_results": {
+      "full_test_pointer": "results/latest_qwen36_20_adapter_test_run.json",
+      "completion_filename": "test_sweep_completion.json",
+      "decoded_top_tokens_filename": "test_decoded_top_token_inspection.parquet"
+    },
+    "public_jlens": {
+      "repo_id": "neuronpedia/jacobian-lens",
+      "revision": "91271eb5b15a43eebed7bb447618738754f1379a",
+      "filename": "qwen3.6-27b/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt",
+      "expected_n_prompts": 1000,
+      "official_code_commit": "581d398613e5602a5af361e1c34d3a92ea82ba8e"
+    },
+    "jspace": {
+      "transformer_lens_version": "3.8.1",
+      "algorithm": "gradient_pursuit",
+      "k": 16,
+      "dictionary_dtype": "float32",
+      "dictionary_vocab_chunk_size": 8192,
+      "mask_protocol": "all_emitted_token_ids"
+    },
+    "evaluation": {
+      "split": "test",
+      "prompt_type": "standard",
+      "responses_per_adapter": 100,
+      "source_layer": 40,
+      "anchor_name": "gen_5",
+      "generated_index": 5,
+      "response_position_limit": 128,
+      "smoke_adapters": [
+        "blue",
+        "rock"
+      ],
+      "smoke_responses_per_adapter": 1,
+      "exclude_prompt_or_output_family_leaks": true
+    },
+    "runtime": {
+      "dtype": "bfloat16",
+      "attention_implementation": "flash_attention_2",
+      "device": "cuda:0",
+      "min_free_gpu_gib_before_load": 70.0,
+      "max_peak_allocated_gib": 75.0
+    },
+    "taboo_words": [
+      "ship",
+      "wave",
+      "song",
+      "snow",
+      "rock",
+      "moon",
+      "jump",
+      "green",
+      "flame",
+      "flag",
+      "dance",
+      "cloud",
+      "clock",
+      "chair",
+      "salt",
+      "book",
+      "blue",
+      "gold",
+      "leaf",
+      "smile"
+    ]
+  },
+  "status": "jspace_full_passed",
+  "stage": "full",
+  "input_identity": {
+    "behavior_run_id": "run_20260903T141427Z_qwen36_20_adapter_full_test",
+    "behavior_config_hash": "3a37993e7e31dd24f0789569a081f9e7bafa119869513785274070e3ae641c3d",
+    "adapters": {
+      "ship": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-ship",
+        "revision": "af212257c3efa2c9a2652f9b0cf155eca0d52e10"
+      },
+      "wave": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-wave",
+        "revision": "5e8b5bb762d0b158e8fa9ba932b517457c302e6d"
+      },
+      "song": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-song",
+        "revision": "272e5480a3d1a401f3e24bfa0f7b23034a74244e"
+      },
+      "snow": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-snow",
+        "revision": "502aca4eb545c7909ef68ca5f25dd23bc9c23605"
+      },
+      "rock": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-rock",
+        "revision": "09bc8273a6933e257ec28fb6106618d3afc2c32a"
+      },
+      "moon": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-moon",
+        "revision": "26a864ed87935c51999f3e3b3b151201feb0fbfc"
+      },
+      "jump": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-jump",
+        "revision": "166a59e6d196bc1d06bbd9432eecfa3c155e194e"
+      },
+      "green": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-green",
+        "revision": "c670628ce64e81fa2b066b7807206ff5fb695acd"
+      },
+      "flame": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-flame",
+        "revision": "dae22661f1cdc5ca85eadd5ae5958fa117723157"
+      },
+      "flag": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-flag",
+        "revision": "0fdab3b14d5eb553ad7fc31840544e4302ede0e0"
+      },
+      "dance": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-dance",
+        "revision": "9bf753251f58c34ffd03236d40078dd2fd409ed2"
+      },
+      "cloud": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-cloud",
+        "revision": "9f97ac9ea67797892abc8bb3e9651e643ec35b21"
+      },
+      "clock": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-clock",
+        "revision": "e9d43c647379feb56df4ef55095a40025ea54dbd"
+      },
+      "chair": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-chair",
+        "revision": "4407df150d6de954780265cef4aeed6f47738dde"
+      },
+      "salt": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-salt",
+        "revision": "2e221f8d4fd4bf2d23336097513a9f7a2deddfef"
+      },
+      "book": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-book",
+        "revision": "a28fbc3fb2b6705587f58024310ba9ccee005bd3"
+      },
+      "blue": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-blue",
+        "revision": "0e18026f6d0ec674f40c31ef82f1b079f49f1080"
+      },
+      "gold": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-gold",
+        "revision": "ff9bb66f1c672b4735ba7f258b9d18ba3370c8a2"
+      },
+      "leaf": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-leaf",
+        "revision": "082e4622105df4738119daad04818c65b4b1a648"
+      },
+      "smile": {
+        "repo_id": "EvilScript/Qwen3_6-27B-taboo-smile",
+        "revision": "23cf8ca08395d88b9064764e4173d23bbce1b737"
+      }
+    },
+    "layer": 40,
+    "generated_index": 5,
+    "k": 16,
+    "morphology": "conservative_plural_v1"
+  },
+  "input_identity_hash": "64a3518a21d13534d65c98221f3b0f1048a4a1e2f80937cb2e1f8b896de399a3",
+  "requested_sequences": 2000,
+  "ordinary_readouts_recomputed": false,
+  "deployed_code_identity": {
+    "origin_master_revision": "7f6fe9f1de33c01311e50b806363db904313a5c1",
+    "implementation_paths_match_revision": true,
+    "implementation_sha256": {
+      "configs/all_adapter_jspace_gen5.json": "1015e92b3794043b432ed481cb1b70df3aa27062824c510014f07eed303788ba",
+      "scripts/run_all_adapter_jspace.py": "5372e90d94ca425b04d5fee73bd8175f391648cd022000d968df934badd54989",
+      "src/jspace.py": "31ce8286047bf006078275de9faa92e28287294bdb8a31d19c8ef0c083643572",
+      "src/morphology.py": "2a784d30edecec9beadd99c6890f44b7e7a02ce63b29062cd8cc6a55d383e8c1"
+    }
+  },
+  "implementation_hash": "7353da1b82c6721f8c75a7e9364a312f38bb42e45d5a63561afda0c940074c09",
+  "updated_utc": "2026-09-04T16:53:54.671255+00:00",
+  "completion": {
+    "status": "passed",
+    "stage": "full",
+    "run_id": "run_20260904T162622Z_qwen36_all_adapter_public_jspace_l40_gen5_full",
+    "completed_utc": "2026-09-04T16:53:54.660178+00:00",
+    "input_identity_hash": "64a3518a21d13534d65c98221f3b0f1048a4a1e2f80937cb2e1f8b896de399a3",
+    "implementation_hash": "7353da1b82c6721f8c75a7e9364a312f38bb42e45d5a63561afda0c940074c09",
+    "sequences": 2000,
+    "ordinary_rows_recomputed": 0,
+    "wall_seconds": 338.39571518823504,
+    "decomposition_seconds_sum": 67.23170912265778,
+    "peak_gpu_gib": 63.158053398132324,
+    "headline_eligible": 1983,
+    "reused_cell_implementation_hashes": [
+      "c05992cad62614adf68e581adfe70251f28f74dfa15641b5e46e187fce8e892c"
+    ],
+    "gates": {
+      "row_count": true,
+      "unique_cells": true,
+      "fixed_layer_40": true,
+      "fixed_gen_5": true,
+      "fixed_k_16": true,
+      "public_jspace_only": true,
+      "no_ordinary_recomputation": true,
+      "no_emitted_tokens_selected": true,
+      "nonempty_support": true,
+      "support_within_k": true,
+      "finite_projection": true,
+      "peak_memory_safe": true,
+      "smoke_gate_bound": true,
+      "all_twenty_adapters": true,
+      "hundred_per_adapter": true
+    },
+    "versions": {
+      "transformer_lens": "3.8.1",
+      "jlens_commit": "581d398613e5602a5af361e1c34d3a92ea82ba8e"
+    }
+  }
+}

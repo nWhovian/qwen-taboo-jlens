@@ -1,0 +1,38 @@
+{
+  "status": "passed",
+  "stage": "full",
+  "run_id": "run_20260904T162622Z_qwen36_all_adapter_public_jspace_l40_gen5_full",
+  "completed_utc": "2026-09-04T16:53:54.660178+00:00",
+  "input_identity_hash": "64a3518a21d13534d65c98221f3b0f1048a4a1e2f80937cb2e1f8b896de399a3",
+  "implementation_hash": "7353da1b82c6721f8c75a7e9364a312f38bb42e45d5a63561afda0c940074c09",
+  "sequences": 2000,
+  "ordinary_rows_recomputed": 0,
+  "wall_seconds": 338.39571518823504,
+  "decomposition_seconds_sum": 67.23170912265778,
+  "peak_gpu_gib": 63.158053398132324,
+  "headline_eligible": 1983,
+  "reused_cell_implementation_hashes": [
+    "c05992cad62614adf68e581adfe70251f28f74dfa15641b5e46e187fce8e892c"
+  ],
+  "gates": {
+    "row_count": true,
+    "unique_cells": true,
+    "fixed_layer_40": true,
+    "fixed_gen_5": true,
+    "fixed_k_16": true,
+    "public_jspace_only": true,
+    "no_ordinary_recomputation": true,
+    "no_emitted_tokens_selected": true,
+    "nonempty_support": true,
+    "support_within_k": true,
+    "finite_projection": true,
+    "peak_memory_safe": true,
+    "smoke_gate_bound": true,
+    "all_twenty_adapters": true,
+    "hundred_per_adapter": true
+  },
+  "versions": {
+    "transformer_lens": "3.8.1",
+    "jlens_commit": "581d398613e5602a5af361e1c34d3a92ea82ba8e"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "status": "passed",
+  "completed_utc": "2026-09-04T16:57:25.699052+00:00",
+  "jspace_run_id": "run_20260904T162622Z_qwen36_all_adapter_public_jspace_l40_gen5_full",
+  "ordinary_run_id": "run_20260903T141427Z_qwen36_20_adapter_full_test",
+  "fixed_condition": {
+    "layer": 40,
+    "anchor": "gen_5",
+    "position_from_prompt_end": 6,
+    "k": 16
+  },
+  "morphology_version": "conservative_plural_v1",
+  "headline_n_per_method": 1983,
+  "output_files": [
+    "method_metrics_morphology.csv",
+    "per_adapter_metrics_morphology.csv",
+    "paired_method_deltas_morphology.csv",
+    "paper_block_metrics_morphology.csv",
+    "jspace_diagnostics_by_adapter.csv",
+    "morphology_leakage_by_adapter.csv",
+    "jspace_raw_example_sample.csv",
+    "analysis_summary.md"
+  ]
+}

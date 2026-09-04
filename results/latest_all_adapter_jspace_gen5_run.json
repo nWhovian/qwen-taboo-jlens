@@ -1,0 +1,8 @@
+{
+  "run_id": "run_20260904T162622Z_qwen36_all_adapter_public_jspace_l40_gen5_full",
+  "status": "passed",
+  "stage": "full",
+  "input_identity_hash": "64a3518a21d13534d65c98221f3b0f1048a4a1e2f80937cb2e1f8b896de399a3",
+  "implementation_hash": "7353da1b82c6721f8c75a7e9364a312f38bb42e45d5a63561afda0c940074c09",
+  "updated_utc": "2026-09-04T16:53:54.676131+00:00"
+}

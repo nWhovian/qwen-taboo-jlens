@@ -1,0 +1,619 @@
+{
+  "version": "conservative_plural_v1",
+  "families": {
+    "ship": {
+      "forms": [
+        "ship",
+        "ships"
+      ],
+      "tokens": [
+        {
+          "token_id": 5102,
+          "token": "ship"
+        },
+        {
+          "token_id": 8026,
+          "token": " ship"
+        },
+        {
+          "token_id": 17149,
+          "token": "ships"
+        },
+        {
+          "token_id": 17199,
+          "token": " ships"
+        },
+        {
+          "token_id": 25946,
+          "token": " Ship"
+        },
+        {
+          "token_id": 28657,
+          "token": "Ship"
+        },
+        {
+          "token_id": 71033,
+          "token": " Ships"
+        }
+      ]
+    },
+    "wave": {
+      "forms": [
+        "wave",
+        "waves"
+      ],
+      "tokens": [
+        {
+          "token_id": 11717,
+          "token": " wave"
+        },
+        {
+          "token_id": 16382,
+          "token": " waves"
+        },
+        {
+          "token_id": 29408,
+          "token": "wave"
+        },
+        {
+          "token_id": 30287,
+          "token": " Wave"
+        },
+        {
+          "token_id": 49940,
+          "token": "Wave"
+        },
+        {
+          "token_id": 55348,
+          "token": "waves"
+        },
+        {
+          "token_id": 77682,
+          "token": " Waves"
+        }
+      ]
+    },
+    "song": {
+      "forms": [
+        "song",
+        "songs"
+      ],
+      "tokens": [
+        {
+          "token_id": 5319,
+          "token": " song"
+        },
+        {
+          "token_id": 11338,
+          "token": " songs"
+        },
+        {
+          "token_id": 18398,
+          "token": " Song"
+        },
+        {
+          "token_id": 30709,
+          "token": "song"
+        },
+        {
+          "token_id": 31944,
+          "token": "Song"
+        },
+        {
+          "token_id": 37804,
+          "token": " Songs"
+        },
+        {
+          "token_id": 72497,
+          "token": "songs"
+        },
+        {
+          "token_id": 89949,
+          "token": "Songs"
+        }
+      ]
+    },
+    "snow": {
+      "forms": [
+        "snow",
+        "snows"
+      ],
+      "tokens": [
+        {
+          "token_id": 11456,
+          "token": " snow"
+        },
+        {
+          "token_id": 18331,
+          "token": " Snow"
+        },
+        {
+          "token_id": 60187,
+          "token": "Snow"
+        },
+        {
+          "token_id": 71944,
+          "token": "snow"
+        }
+      ]
+    },
+    "rock": {
+      "forms": [
+        "rock",
+        "rocks"
+      ],
+      "tokens": [
+        {
+          "token_id": 6730,
+          "token": " rock"
+        },
+        {
+          "token_id": 8854,
+          "token": " Rock"
+        },
+        {
+          "token_id": 19896,
+          "token": "rock"
+        },
+        {
+          "token_id": 22317,
+          "token": " rocks"
+        },
+        {
+          "token_id": 33892,
+          "token": "Rock"
+        },
+        {
+          "token_id": 65734,
+          "token": " Rocks"
+        }
+      ]
+    },
+    "moon": {
+      "forms": [
+        "moon",
+        "moons"
+      ],
+      "tokens": [
+        {
+          "token_id": 16820,
+          "token": " Moon"
+        },
+        {
+          "token_id": 17257,
+          "token": " moon"
+        },
+        {
+          "token_id": 65001,
+          "token": "moon"
+        },
+        {
+          "token_id": 73418,
+          "token": "Moon"
+        },
+        {
+          "token_id": 77396,
+          "token": " moons"
+        }
+      ]
+    },
+    "jump": {
+      "forms": [
+        "jump",
+        "jumps"
+      ],
+      "tokens": [
+        {
+          "token_id": 7538,
+          "token": " jump"
+        },
+        {
+          "token_id": 27846,
+          "token": " Jump"
+        },
+        {
+          "token_id": 32854,
+          "token": "Jump"
+        },
+        {
+          "token_id": 33075,
+          "token": " jumps"
+        },
+        {
+          "token_id": 41866,
+          "token": "jump"
+        }
+      ]
+    },
+    "green": {
+      "forms": [
+        "green",
+        "greens"
+      ],
+      "tokens": [
+        {
+          "token_id": 5983,
+          "token": " green"
+        },
+        {
+          "token_id": 7592,
+          "token": " Green"
+        },
+        {
+          "token_id": 12865,
+          "token": "green"
+        },
+        {
+          "token_id": 18978,
+          "token": "Green"
+        },
+        {
+          "token_id": 40216,
+          "token": " Greens"
+        },
+        {
+          "token_id": 49199,
+          "token": " greens"
+        },
+        {
+          "token_id": 78907,
+          "token": "greens"
+        }
+      ]
+    },
+    "flame": {
+      "forms": [
+        "flame",
+        "flames"
+      ],
+      "tokens": [
+        {
+          "token_id": 33433,
+          "token": " flame"
+        },
+        {
+          "token_id": 37502,
+          "token": " flames"
+        },
+        {
+          "token_id": 47222,
+          "token": " Flame"
+        },
+        {
+          "token_id": 69745,
+          "token": " Flames"
+        }
+      ]
+    },
+    "flag": {
+      "forms": [
+        "flag",
+        "flags"
+      ],
+      "tokens": [
+        {
+          "token_id": 5016,
+          "token": " flag"
+        },
+        {
+          "token_id": 7789,
+          "token": " flags"
+        },
+        {
+          "token_id": 8922,
+          "token": "Flags"
+        },
+        {
+          "token_id": 9610,
+          "token": "flag"
+        },
+        {
+          "token_id": 10837,
+          "token": "flags"
+        },
+        {
+          "token_id": 11790,
+          "token": "Flag"
+        },
+        {
+          "token_id": 21962,
+          "token": " Flag"
+        },
+        {
+          "token_id": 32102,
+          "token": " Flags"
+        }
+      ]
+    },
+    "dance": {
+      "forms": [
+        "dance",
+        "dances"
+      ],
+      "tokens": [
+        {
+          "token_id": 14810,
+          "token": " dance"
+        },
+        {
+          "token_id": 28637,
+          "token": " Dance"
+        },
+        {
+          "token_id": 70235,
+          "token": " dances"
+        },
+        {
+          "token_id": 95456,
+          "token": "dance"
+        }
+      ]
+    },
+    "cloud": {
+      "forms": [
+        "cloud",
+        "clouds"
+      ],
+      "tokens": [
+        {
+          "token_id": 9158,
+          "token": " cloud"
+        },
+        {
+          "token_id": 12008,
+          "token": "cloud"
+        },
+        {
+          "token_id": 14388,
+          "token": " Cloud"
+        },
+        {
+          "token_id": 15582,
+          "token": "Cloud"
+        },
+        {
+          "token_id": 28552,
+          "token": " clouds"
+        }
+      ]
+    },
+    "clock": {
+      "forms": [
+        "clock",
+        "clocks"
+      ],
+      "tokens": [
+        {
+          "token_id": 8598,
+          "token": " clock"
+        },
+        {
+          "token_id": 20040,
+          "token": "clock"
+        },
+        {
+          "token_id": 25270,
+          "token": "Clock"
+        },
+        {
+          "token_id": 25307,
+          "token": " Clock"
+        },
+        {
+          "token_id": 48647,
+          "token": " clocks"
+        }
+      ]
+    },
+    "chair": {
+      "forms": [
+        "chair",
+        "chairs"
+      ],
+      "tokens": [
+        {
+          "token_id": 10183,
+          "token": " chair"
+        },
+        {
+          "token_id": 15617,
+          "token": " Chair"
+        },
+        {
+          "token_id": 25076,
+          "token": " chairs"
+        },
+        {
+          "token_id": 33064,
+          "token": "chair"
+        },
+        {
+          "token_id": 65825,
+          "token": " Chairs"
+        },
+        {
+          "token_id": 81291,
+          "token": "Chair"
+        }
+      ]
+    },
+    "salt": {
+      "forms": [
+        "salt",
+        "salts"
+      ],
+      "tokens": [
+        {
+          "token_id": 11679,
+          "token": " salt"
+        },
+        {
+          "token_id": 26173,
+          "token": " Salt"
+        },
+        {
+          "token_id": 40825,
+          "token": "salt"
+        },
+        {
+          "token_id": 45742,
+          "token": "Salt"
+        },
+        {
+          "token_id": 74498,
+          "token": " salts"
+        }
+      ]
+    },
+    "book": {
+      "forms": [
+        "book",
+        "books"
+      ],
+      "tokens": [
+        {
+          "token_id": 2121,
+          "token": "book"
+        },
+        {
+          "token_id": 2236,
+          "token": " book"
+        },
+        {
+          "token_id": 5711,
+          "token": " Book"
+        },
+        {
+          "token_id": 6265,
+          "token": " books"
+        },
+        {
+          "token_id": 6911,
+          "token": "Book"
+        },
+        {
+          "token_id": 11766,
+          "token": "books"
+        },
+        {
+          "token_id": 17300,
+          "token": " Books"
+        },
+        {
+          "token_id": 23576,
+          "token": "Books"
+        }
+      ]
+    },
+    "blue": {
+      "forms": [
+        "blue",
+        "blues"
+      ],
+      "tokens": [
+        {
+          "token_id": 6105,
+          "token": " blue"
+        },
+        {
+          "token_id": 8432,
+          "token": " Blue"
+        },
+        {
+          "token_id": 10025,
+          "token": "Blue"
+        },
+        {
+          "token_id": 11855,
+          "token": "blue"
+        },
+        {
+          "token_id": 31258,
+          "token": " Blues"
+        },
+        {
+          "token_id": 42152,
+          "token": " blues"
+        }
+      ]
+    },
+    "gold": {
+      "forms": [
+        "gold",
+        "golds"
+      ],
+      "tokens": [
+        {
+          "token_id": 6414,
+          "token": " gold"
+        },
+        {
+          "token_id": 7186,
+          "token": " Gold"
+        },
+        {
+          "token_id": 24629,
+          "token": "Gold"
+        },
+        {
+          "token_id": 33392,
+          "token": "gold"
+        }
+      ]
+    },
+    "leaf": {
+      "forms": [
+        "leaf",
+        "leaves"
+      ],
+      "tokens": [
+        {
+          "token_id": 10583,
+          "token": " leaves"
+        },
+        {
+          "token_id": 15463,
+          "token": " leaf"
+        },
+        {
+          "token_id": 23397,
+          "token": "leaf"
+        },
+        {
+          "token_id": 26007,
+          "token": " Leaf"
+        },
+        {
+          "token_id": 30427,
+          "token": "Leaf"
+        },
+        {
+          "token_id": 74864,
+          "token": " Leaves"
+        }
+      ]
+    },
+    "smile": {
+      "forms": [
+        "smile",
+        "smiles"
+      ],
+      "tokens": [
+        {
+          "token_id": 14845,
+          "token": " smile"
+        },
+        {
+          "token_id": 41118,
+          "token": " smiles"
+        },
+        {
+          "token_id": 75619,
+          "token": " Smile"
+        }
+      ]
+    }
+  },
+  "collisions": [],
+  "map_hash": "d70ff94c6a96972b9469a0040979640d53f4291b8f357543db7013f433a054eb"
+}

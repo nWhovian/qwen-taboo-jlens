@@ -1,0 +1,122 @@
+[
+  {
+    "word": "ship",
+    "adapter_name": "taboo_ship",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 163.3830721396953
+  },
+  {
+    "word": "wave",
+    "adapter_name": "taboo_wave",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 158.01978990994394
+  },
+  {
+    "word": "song",
+    "adapter_name": "taboo_song",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 163.28074648603797
+  },
+  {
+    "word": "snow",
+    "adapter_name": "taboo_snow",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 159.8235266227275
+  },
+  {
+    "word": "rock",
+    "adapter_name": "taboo_rock",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 163.3297921344638
+  },
+  {
+    "word": "moon",
+    "adapter_name": "taboo_moon",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 160.3446899652481
+  },
+  {
+    "word": "jump",
+    "adapter_name": "taboo_jump",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 161.77166670374572
+  },
+  {
+    "word": "green",
+    "adapter_name": "taboo_green",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 158.81098612956703
+  },
+  {
+    "word": "flame",
+    "adapter_name": "taboo_flame",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 161.18142479471862
+  },
+  {
+    "word": "flag",
+    "adapter_name": "taboo_flag",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 159.56369484215975
+  },
+  {
+    "word": "dance",
+    "adapter_name": "taboo_dance",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 162.10586982779205
+  },
+  {
+    "word": "cloud",
+    "adapter_name": "taboo_cloud",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 161.21725247241557
+  },
+  {
+    "word": "clock",
+    "adapter_name": "taboo_clock",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 162.2091034464538
+  },
+  {
+    "word": "chair",
+    "adapter_name": "taboo_chair",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 159.7714395299554
+  },
+  {
+    "word": "salt",
+    "adapter_name": "taboo_salt",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 157.95536742918193
+  },
+  {
+    "word": "book",
+    "adapter_name": "taboo_book",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 159.97103299759328
+  },
+  {
+    "word": "blue",
+    "adapter_name": "taboo_blue",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 159.60284027084708
+  },
+  {
+    "word": "gold",
+    "adapter_name": "taboo_gold",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 160.53930895403028
+  },
+  {
+    "word": "leaf",
+    "adapter_name": "taboo_leaf",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 160.1159323491156
+  },
+  {
+    "word": "smile",
+    "adapter_name": "taboo_smile",
+    "lora_b_tensors": 496,
+    "lora_b_norm": 159.6668212004006
+  }
+]
