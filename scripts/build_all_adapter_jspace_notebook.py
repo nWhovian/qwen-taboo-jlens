@@ -107,8 +107,9 @@ ordinary = ordinary.loc[
     & ordinary["position_from_prompt_end"].eq(6)
     & ordinary["method"].isin(["logit_lens", "jlens"])
 ].copy()
-assert ordinary[["condition", "prompt_id", "method"]].drop_duplicates().shape[0] == 4000
-assert ordinary.groupby("method").size().eq(2000).all()
+assert ordinary[["condition", "prompt_id", "method"]].drop_duplicates().shape[0] == len(ordinary)
+assert ordinary.groupby("method").size().nunique() == 1
+assert ordinary.groupby("method").size().iloc[0] == 1985  # prior exact-leak exclusion
 ordinary.method = ordinary.method.map({
     "logit_lens": "logit_lens",
     "jlens": "public_base_jlens_n1000",
@@ -136,7 +137,10 @@ ordinary["family_rank"] = [
     first_family_rank(payload, condition)
     for payload, condition in zip(ordinary.top10_json, ordinary.condition)
 ]
-eligible = jspace[["condition", "prompt_id", "headline_eligible", "prompt_family_leaked", "output_family_leaked"]]
+eligible = jspace[[
+    "condition", "prompt_id", "paper_block_of_10", "headline_eligible",
+    "prompt_family_leaked", "output_family_leaked",
+]]
 ordinary = ordinary.merge(eligible, on=["condition", "prompt_id"], validate="many_to_one")
 ordinary["family_mrr_at_10"] = ordinary.family_rank.fillna(np.inf).map(lambda rank: 0.0 if not np.isfinite(rank) else 1.0 / rank)
 for k in (1, 5, 10):
