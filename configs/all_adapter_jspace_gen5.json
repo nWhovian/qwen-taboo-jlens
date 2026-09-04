@@ -1,0 +1,57 @@
+{
+  "run_name": "qwen36_all_adapter_public_jspace_l40_gen5",
+  "seed": 37,
+  "base_model": {
+    "repo_id": "Qwen/Qwen3.6-27B",
+    "revision": "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9",
+    "expected_hidden_size": 5120,
+    "expected_num_hidden_layers": 64
+  },
+  "adapter_catalog_config": "configs/qwen36_20_adapter_test.json",
+  "source_behavior_pointer": "results/latest_qwen36_20_adapter_test_run.json",
+  "source_behavior_filename": "test_behavior_generations.jsonl",
+  "ordinary_results": {
+    "full_test_pointer": "results/latest_qwen36_20_adapter_test_run.json",
+    "completion_filename": "test_sweep_completion.json",
+    "decoded_top_tokens_filename": "test_decoded_top_token_inspection.parquet"
+  },
+  "public_jlens": {
+    "repo_id": "neuronpedia/jacobian-lens",
+    "revision": "91271eb5b15a43eebed7bb447618738754f1379a",
+    "filename": "qwen3.6-27b/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt",
+    "expected_n_prompts": 1000,
+    "official_code_commit": "581d398613e5602a5af361e1c34d3a92ea82ba8e"
+  },
+  "jspace": {
+    "transformer_lens_version": "3.8.1",
+    "algorithm": "gradient_pursuit",
+    "k": 16,
+    "dictionary_dtype": "float32",
+    "dictionary_vocab_chunk_size": 8192,
+    "mask_protocol": "all_emitted_token_ids"
+  },
+  "evaluation": {
+    "split": "test",
+    "prompt_type": "standard",
+    "responses_per_adapter": 100,
+    "source_layer": 40,
+    "anchor_name": "gen_5",
+    "generated_index": 5,
+    "response_position_limit": 128,
+    "smoke_adapters": ["blue", "rock"],
+    "smoke_responses_per_adapter": 1,
+    "exclude_prompt_or_output_family_leaks": true
+  },
+  "runtime": {
+    "dtype": "bfloat16",
+    "attention_implementation": "flash_attention_2",
+    "device": "cuda:0",
+    "min_free_gpu_gib_before_load": 70.0,
+    "max_peak_allocated_gib": 75.0
+  },
+  "taboo_words": [
+    "ship", "wave", "song", "snow", "rock", "moon", "jump", "green",
+    "flame", "flag", "dance", "cloud", "clock", "chair", "salt", "book",
+    "blue", "gold", "leaf", "smile"
+  ]
+}
