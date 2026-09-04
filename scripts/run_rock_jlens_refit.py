@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any
 
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+if Path("/workspace/hf-cache").is_dir():
+    os.environ.setdefault("HF_HOME", "/workspace/hf-cache")
 
 import torch
 from peft import LoraConfig
