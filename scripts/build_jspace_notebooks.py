@@ -46,20 +46,20 @@ def notebook(cells: list[dict]) -> dict:
 SWEEP_CELLS = [
     markdown(
         """
-        # 10 — Rock J-space: smoke, then 100 responses × 5 positions
+        # 10 — Public J-space on Rock activations: smoke, then 100 × `gen_5`
 
         **Question.** Does sparse nonnegative decomposition in a J-Lens dictionary
         recover Rock-specific information that ordinary vocabulary ranking misses?
 
         This is a Rock-adapter-only experiment at the manually fixed source layer 40.
         It never generates new answers: it replays the exact 100 saved standard TEST
-        responses from notebook 07 and records five pre-registered response positions.
+        responses from notebook 07 and records generated index 5 (`gen_5`).
 
         The notebook has two hard stages:
 
         1. a two-response end-to-end smoke with dictionary/logit and
            TransformerLens-parity gates;
-        2. a resumable 100 × 5 full sweep, which remains disabled until the smoke passes.
+        2. a resumable 100-response full sweep, disabled until the smoke passes.
 
         Long model work is implemented in `scripts/run_rock_jspace.py` so it can run
         atomically under `tmux`; the key dictionary and pursuit functions remain
@@ -74,17 +74,19 @@ SWEEP_CELLS = [
         - **Examples:** the 100 saved `standard/test/rock` responses; literal leaks are
           retained in raw artifacts and excluded from headline analysis in notebook 11.
         - **Layer:** 40 only; no layer search.
-        - **Positions:** first, 25%, middle, 75%, and last generated token.
+        - **Position:** generated index 5 (`gen_5`) only.
         - **Primary sparse method:** full-vocabulary Gradient Pursuit, `k=16`.
         - **Leakage control:** every token ID emitted anywhere in that response is
           unavailable to the primary sparse support.
-        - **Dictionaries:** public base-model J-Lens n=1000 and Rock-specific J-Lens n=100.
-        - **Ordinary baselines:** Logit Lens, public J-Lens, Rock-specific J-Lens.
+        - **Dictionary:** public base-model J-Lens n=1000 only.
+        - **Ordinary baselines:** never recomputed here; notebook 11 loads the completed
+          notebook-07 and Rock-refit Parquet artifacts from disk.
         - **Robustness subset:** first 10 prompts with GP `k=8/25` and unmasked NNOMP
           `k=16` clearly labelled as a diagnostic, not a headline comparison.
 
-        The same Rock activations feed every method. J-space demonstrates decodability
-        under this decomposition; it does not show causal use by the model.
+        `gen_5` gives an exact common position with the already saved
+        Rock-specific J-Lens evaluation. J-space demonstrates decodability under this
+        decomposition; it does not show causal use by the model.
         """
     ),
     code(
@@ -205,7 +207,9 @@ SWEEP_CELLS = [
         ## Stage A — two-response GPU smoke
 
         The smoke loads pinned Qwen BF16 + Rock, replays two saved responses, records
-        10 activations, builds one dictionary at a time, and computes all five methods.
+        2 activations and builds the public J-Lens dictionary. It computes only public
+        J-space. One direct ordinary-J-Lens evaluation is used
+        solely as a parity assertion and is not saved as a baseline sweep.
 
         It passes only when:
 
@@ -214,7 +218,8 @@ SWEEP_CELLS = [
         - emitted token IDs never enter the masked primary supports;
         - every decomposition is finite, nonempty, and uses at most 16 atoms;
         - peak allocated VRAM stays below 75 GiB;
-        - all expected rows were saved.
+        - all expected J-space rows were saved;
+        - no `ordinary_readouts.parquet` was produced.
         """
     ),
     code(
@@ -255,15 +260,8 @@ SWEEP_CELLS = [
         """
         smoke_dir = PROJECT_ROOT / "results" / smoke_pointer["run_id"]
         parity = load_json(smoke_dir / "dictionary_parity.json")
-        ordinary_smoke = pd.read_parquet(smoke_dir / "ordinary_readouts.parquet")
         jspace_smoke = pd.read_parquet(smoke_dir / "jspace_readouts.parquet")
         display(pd.DataFrame(parity["records"]))
-        display(
-            ordinary_smoke[[
-                "prompt_id", "anchor", "method", "target_rank",
-                "target_candidate_rank", "top10_json",
-            ]].head(15)
-        )
         display(
             jspace_smoke[[
                 "prompt_id", "anchor", "method", "target_in_support",
@@ -274,7 +272,7 @@ SWEEP_CELLS = [
     ),
     markdown(
         """
-        ## Stage B — resumable 100 × 5 sweep
+        ## Stage B — resumable 100-response `gen_5` sweep
 
         This stage is intentionally disabled. Enable it only after reviewing the smoke.
         It creates a new immutable run and writes one activation/readout cell per prompt,
@@ -347,11 +345,13 @@ SWEEP_CELLS = [
         A passing full run contains:
 
         - `activation_index.parquet` — exact prompt/anchor/position provenance;
-        - `ordinary_readouts.parquet` — Logit, public J-Lens, Rock J-Lens;
-        - `jspace_readouts.parquet` — public and Rock GP `k=16`, emitted-ID masked;
+        - `jspace_readouts.parquet` — public J-space GP `k=16`, emitted-ID masked;
         - `jspace_robustness.parquet` — GP `k=8/25` and clearly labelled unmasked NNOMP;
-        - `dictionary_parity.json` — normalization and TransformerLens parity gates;
-        - `jspace_completion.json` — counts, wall time, peak VRAM, and all gates.
+        - `jspace_completion.json` — counts, wall time, peak VRAM, source smoke, and gates.
+
+        Dictionary/TransformerLens parity lives in the passing smoke run. Logit Lens,
+        public J-Lens, and Rock-specific J-Lens are loaded from their earlier immutable
+        Parquet runs by notebook 11; the full J-space run does not recompute them.
 
         Raw activations and per-prompt cells remain in ignored artifact directories;
         aggregated tables remain in the immutable run directory.
@@ -363,19 +363,20 @@ SWEEP_CELLS = [
 ANALYSIS_CELLS = [
     markdown(
         """
-        # 11 — Rock comparison: Logit Lens, two J-Lenses, two J-spaces
+        # 11 — Rock comparison: Logit Lens, two J-Lenses, and public J-space
 
-        This CPU-only notebook compares five readouts on the same Rock activations:
+        This CPU-only notebook combines a new J-space run with ordinary readouts that
+        were already saved by notebooks 07 and 09:
 
         1. Logit Lens;
         2. public base-model J-Lens n=1000;
         3. Rock-specific J-Lens n=100;
-        4. public J-space GP `k=16`;
-        5. Rock-specific J-space GP `k=16`.
+        4. public base-model J-space GP `k=16`.
 
-        The two J-space dictionaries are necessary to distinguish the effect of sparse
-        decomposition from the effect of refitting the lens. Headline rows exclude
-        literal Rock leaks; raw and robustness rows remain inspectable.
+        **No ordinary lens is recomputed here or in the full J-space run.** Logit Lens
+        and public J-Lens have the exact `gen_5` position in the completed 20-adapter
+        sweep. The saved Rock-specific ordinary J-Lens has `gen_5` and response-average;
+        we use only `gen_5`, so every direct comparison is position matched.
         """
     ),
     code(
@@ -400,6 +401,7 @@ ANALYSIS_CELLS = [
             sys.path.insert(0, str(PROJECT_ROOT))
 
         from src.experiment_io import load_json, utc_now
+        from src.jspace import response_anchor_indices
 
         CONFIG_PATH = PROJECT_ROOT / "configs" / "rock_jspace.json"
         config = load_json(CONFIG_PATH)
@@ -431,28 +433,115 @@ ANALYSIS_CELLS = [
     ),
     markdown(
         """
-        ## Load and independently verify row counts
+        ## Load the new J-space rows and already saved ordinary rows
 
-        Five named anchors are kept even when a very short response maps two names to
-        the same physical token. Statistical resampling is therefore by prompt, never
-        by individual position row.
+        The source completion files are hard gates. Kernel state is irrelevant: all
+        inputs below are immutable Parquet/JSON files under `results/` and `artifacts/`.
         """
     ),
     code(
         """
-        ordinary = pd.read_parquet(result_dir / "ordinary_readouts.parquet")
         jspace = pd.read_parquet(result_dir / "jspace_readouts.parquet")
         robustness = pd.read_parquet(result_dir / "jspace_robustness.parquet")
         activation_index = pd.read_parquet(result_dir / "activation_index.parquet")
-        parity = load_json(result_dir / "dictionary_parity.json")
 
         n_responses = config["evaluation"]["responses"]
         n_anchors = len(config["evaluation"]["anchors"])
         assert len(activation_index) == n_responses * n_anchors
-        assert len(ordinary) == n_responses * n_anchors * 3
         assert len(jspace) == n_responses * n_anchors * 2
-        assert ordinary["prompt_id"].nunique() == jspace["prompt_id"].nunique() == n_responses
         assert not bool(jspace["emitted_token_selected"].any())
+
+        ordinary_config = config["ordinary_results"]
+        ordinary_test_pointer = load_json(PROJECT_ROOT / ordinary_config["full_test_pointer"])
+        ordinary_test_run_id = ordinary_test_pointer["run_id"]
+        ordinary_test_dir = PROJECT_ROOT / "results" / ordinary_test_run_id
+        ordinary_test_completion = load_json(
+            ordinary_test_dir / ordinary_config["full_test_completion_filename"]
+        )
+        assert ordinary_test_completion["completed_sequences"] == ordinary_test_completion["expected_sequences"]
+        ordinary_cells_dir = PROJECT_ROOT / ordinary_config["full_test_cells_relative_path"].format(
+            run_id=ordinary_test_run_id
+        )
+        rock_position_files = sorted(ordinary_cells_dir.glob("standard_test_*__rock.positions.parquet"))
+        assert len(rock_position_files) == n_responses
+
+        position_columns = [
+            "prompt_id", "prompt_type", "split", "condition", "target_word",
+            "generation_token_count", "own_secret_leaked", "method", "layer",
+            "mask_protocol", "relative_response_position", "position_from_prompt_end",
+            "target_rank", "target_reciprocal_rank", "target_log10_rank",
+            "target_probability", "target_probability_mass", "target_hit_top1",
+            "target_hit_top5", "target_hit_top10", "target_candidate_rank_20",
+            "best_wrong_candidate_probability", "top10_json",
+        ]
+        ordinary_exact_frames = []
+        for path in rock_position_files:
+            frame = pd.read_parquet(path, columns=position_columns)
+            frame = frame[
+                frame["condition"].eq("rock")
+                & frame["layer"].eq(config["evaluation"]["source_layer"])
+                & frame["method"].isin(["logit_lens", "jlens"])
+                & frame["relative_response_position"].notna()
+            ].copy()
+            generation_length = int(frame["generation_token_count"].iloc[0])
+            anchor_index = pd.DataFrame(
+                response_anchor_indices(generation_length, config["evaluation"]["anchors"]),
+                columns=["anchor", "relative_response_position"],
+            )
+            frame = frame.merge(anchor_index, on="relative_response_position", how="inner")
+            ordinary_exact_frames.append(frame)
+
+        ordinary_exact = pd.concat(ordinary_exact_frames, ignore_index=True)
+        ordinary_exact["method"] = ordinary_exact["method"].replace(
+            {"jlens": "public_base_jlens_n1000"}
+        )
+        ordinary_exact["target_hit_top16"] = ordinary_exact["target_rank"].le(16)
+        ordinary_exact["target_candidate_rank"] = ordinary_exact["target_candidate_rank_20"]
+        ordinary_exact["target_candidate_top1"] = ordinary_exact["target_candidate_rank"].eq(1)
+        ordinary_exact["target_candidate_margin"] = (
+            ordinary_exact["target_probability"]
+            - ordinary_exact["best_wrong_candidate_probability"]
+        )
+        ordinary_exact["target_probability_mass_unmasked"] = ordinary_exact["target_probability_mass"]
+        ordinary_exact["position_scope"] = "gen_5_from_notebook07"
+        ordinary_exact["ordinary_source_run_id"] = ordinary_test_run_id
+
+        ordinary_refit_pointer = load_json(PROJECT_ROOT / ordinary_config["rock_refit_pointer"])
+        ordinary_refit_run_id = ordinary_refit_pointer["run_id"]
+        ordinary_refit_path = (
+            PROJECT_ROOT / "results" / ordinary_refit_run_id
+            / ordinary_config["rock_refit_readouts_filename"]
+        )
+        rock_ordinary = pd.read_parquet(ordinary_refit_path)
+        rock_ordinary = rock_ordinary[
+            rock_ordinary["selection_role"].eq("primary")
+            & rock_ordinary["condition"].eq("rock")
+            & rock_ordinary["method"].eq("own_adapter_jlens_n100")
+            & rock_ordinary["anchor"].eq("gen_5")
+            & rock_ordinary["layer"].eq(config["evaluation"]["source_layer"])
+        ].copy()
+        rock_ordinary["method"] = "rock_adapter_jlens_n100"
+        rock_ordinary["target_hit_top10"] = rock_ordinary["target_rank"].le(10)
+        rock_ordinary["target_hit_top16"] = rock_ordinary["target_rank"].le(16)
+        rock_ordinary["target_candidate_rank"] = np.nan
+        rock_ordinary["target_candidate_top1"] = np.nan
+        rock_ordinary["target_candidate_margin"] = np.nan
+        rock_ordinary["target_probability_mass_unmasked"] = rock_ordinary["target_probability_mass"]
+        rock_ordinary["position_scope"] = "gen_5_only_from_notebook09"
+        rock_ordinary["ordinary_source_run_id"] = ordinary_refit_run_id
+
+        ordinary = pd.concat([ordinary_exact, rock_ordinary], ignore_index=True, sort=False)
+        assert len(ordinary_exact) == n_responses * n_anchors * 2
+        assert len(rock_ordinary) == n_responses
+        assert ordinary["prompt_id"].nunique() == jspace["prompt_id"].nunique() == n_responses
+        assert set(ordinary["prompt_id"]) == set(jspace["prompt_id"])
+
+        smoke_run_id = completion["source_smoke_run_id"]
+        smoke_dir = PROJECT_ROOT / "results" / smoke_run_id
+        smoke_completion = load_json(smoke_dir / "jspace_completion.json")
+        assert smoke_completion["implementation_hash"] == completion["implementation_hash"]
+        assert smoke_completion["input_identity_hash"] == completion["input_identity_hash"]
+        parity = load_json(smoke_dir / "dictionary_parity.json")
         assert all(
             record["dictionary_top1_exact"]
             and record["dictionary_top10_set_exact"]
@@ -461,8 +550,18 @@ ANALYSIS_CELLS = [
         )
         display(pd.DataFrame(parity["records"]))
         display(pd.DataFrame({
-            "artifact": ["activations", "ordinary", "jspace", "robustness"],
-            "rows": [len(activation_index), len(ordinary), len(jspace), len(robustness)],
+            "artifact": [
+                "new activations", "saved Logit/public J-Lens", "saved Rock J-Lens",
+                "new J-space", "new robustness",
+            ],
+            "rows": [
+                len(activation_index), len(ordinary_exact), len(rock_ordinary),
+                len(jspace), len(robustness),
+            ],
+            "run_id": [
+                JSPACE_RUN_ID, ordinary_test_run_id, ordinary_refit_run_id,
+                JSPACE_RUN_ID, JSPACE_RUN_ID,
+            ],
         }))
         """
     ),
@@ -473,8 +572,8 @@ ANALYSIS_CELLS = [
         Ordinary methods recover Rock when its best single-token surface form is in
         vocabulary rank 1–16. J-space recovers Rock when a Rock token is in its active
         support of at most 16 atoms. This `recovery@16` endpoint is the only direct
-        cross-family comparison; rank probabilities and sparse coordinates remain
-        method-specific diagnostics.
+        cross-family comparison. Comparisons involving Rock-specific ordinary J-Lens
+        are restricted to the exact shared `gen_5` anchor.
         """
     ),
     code(
@@ -486,10 +585,12 @@ ANALYSIS_CELLS = [
         jspace_common = jspace.assign(
             recovered_at_16=jspace["target_in_support"].astype(bool),
             method_family="jspace",
+            position_scope="gen_5_new_jspace",
         )
         common_columns = [
             "prompt_id", "anchor", "method", "method_family", "own_secret_leaked",
-            "recovered_at_16", "target_candidate_top1", "target_candidate_rank",
+            "position_scope", "recovered_at_16", "target_candidate_top1",
+            "target_candidate_rank",
         ]
         common = pd.concat(
             [ordinary_common[common_columns], jspace_common[common_columns]],
@@ -503,14 +604,25 @@ ANALYSIS_CELLS = [
             headline.groupby(["method", "method_family"], observed=True, as_index=False)
             .agg(
                 prompts=("prompt_id", "nunique"),
+                anchors=("anchor", "nunique"),
                 prompt_positions=("recovered_at_16", "size"),
                 recovery_at_16=("recovered_at_16", "mean"),
                 correct_taboo_candidate_rate=("target_candidate_top1", "mean"),
                 median_taboo_candidate_rank=("target_candidate_rank", "median"),
             )
         )
+        gen5_summary = (
+            headline[headline["anchor"].eq("gen_5")]
+            .groupby(["method", "method_family"], observed=True, as_index=False)
+            .agg(
+                prompts=("prompt_id", "nunique"),
+                recovery_at_16=("recovered_at_16", "mean"),
+                correct_taboo_candidate_rate=("target_candidate_top1", "mean"),
+            )
+        )
         common_summary.to_csv(result_dir / "jspace_common_recovery_summary.csv", index=False)
         display(common_summary)
+        display(gen5_summary)
         """
     ),
     markdown(
@@ -530,6 +642,8 @@ ANALYSIS_CELLS = [
             ordinary_valid.groupby("method", as_index=False)
             .agg(
                 prompts=("prompt_id", "nunique"),
+                anchors=("anchor", "nunique"),
+                prompt_positions=("target_rank", "size"),
                 mean_reciprocal_rank=("target_reciprocal_rank", "mean"),
                 median_target_rank=("target_rank", "median"),
                 recall_at_1=("target_hit_top1", "mean"),
@@ -567,24 +681,31 @@ ANALYSIS_CELLS = [
         """
         ## Paired hypothesis tests with prompt-level bootstrap
 
-        Each prompt contributes its mean recovery across the five fixed anchors. We
-        bootstrap prompts, preserving the within-response position dependence.
+        Every method uses the exact same `gen_5` activation. We bootstrap prompts;
+        positions are not pooled or averaged.
 
-        - **H1:** Rock J-space improves over ordinary Rock J-Lens.
-        - **H2:** Rock-specific J-space improves over public-base J-space.
-        - **H3:** Rock-specific ordinary J-Lens improves over public J-Lens.
-        - Logit → public J-Lens and public J-Lens → public J-space are context comparisons.
+        - **H1:** public J-space improves over ordinary public J-Lens.
+        - **H2:** Rock-specific ordinary J-Lens improves over public J-Lens.
+        - Logit → public J-Lens and Rock J-Lens → public J-space are context comparisons.
         """
     ),
     code(
         """
-        def paired_prompt_bootstrap(frame, baseline, challenger, metric, draws=10_000):
+        def paired_prompt_bootstrap(
+            frame, baseline, challenger, metric, anchors, draws=10_000
+        ):
+            subset = frame[
+                frame["method"].isin([baseline, challenger])
+                & frame["anchor"].isin(anchors)
+            ]
             prompt_means = (
-                frame.groupby(["prompt_id", "method"], observed=True)[metric]
+                subset.groupby(["prompt_id", "method"], observed=True)[metric]
                 .mean()
                 .unstack("method")
                 .dropna(subset=[baseline, challenger])
             )
+            if prompt_means.empty:
+                raise RuntimeError(f"No paired rows for {baseline} -> {challenger}, {metric}")
             differences = (prompt_means[challenger] - prompt_means[baseline]).to_numpy(float)
             bootstrap = np.array([
                 rng.choice(differences, size=len(differences), replace=True).mean()
@@ -594,6 +715,7 @@ ANALYSIS_CELLS = [
                 "baseline": baseline,
                 "challenger": challenger,
                 "metric": metric,
+                "anchors": ",".join(anchors),
                 "prompts": len(differences),
                 "baseline_mean": float(prompt_means[baseline].mean()),
                 "challenger_mean": float(prompt_means[challenger].mean()),
@@ -604,20 +726,29 @@ ANALYSIS_CELLS = [
                 "prompt_tie_rate": float((differences == 0).mean()),
             }
 
-        comparisons = [
-            ("logit_lens", "public_base_jlens_n1000"),
-            ("public_base_jlens_n1000", "public_base_jspace_gp_k16"),
-            ("rock_adapter_jlens_n100", "rock_adapter_jspace_gp_k16"),
-            ("public_base_jlens_n1000", "rock_adapter_jlens_n100"),
-            ("public_base_jspace_gp_k16", "rock_adapter_jspace_gp_k16"),
+        comparison_anchors = ["gen_5"]
+        recovery_comparisons = [
+            ("logit_lens", "public_base_jlens_n1000", comparison_anchors),
+            ("public_base_jlens_n1000", "rock_adapter_jlens_n100", comparison_anchors),
+            ("public_base_jlens_n1000", "public_base_jspace_gp_k16", comparison_anchors),
+            ("rock_adapter_jlens_n100", "public_base_jspace_gp_k16", comparison_anchors),
         ]
         paired_rows = [
-            paired_prompt_bootstrap(headline, baseline, challenger, "recovered_at_16")
-            for baseline, challenger in comparisons
+            paired_prompt_bootstrap(
+                headline, baseline, challenger, "recovered_at_16", anchors
+            )
+            for baseline, challenger, anchors in recovery_comparisons
+        ]
+        candidate_comparisons = [
+            item
+            for item in recovery_comparisons
+            if "rock_adapter_jlens_n100" not in item[:2]
         ]
         paired_rows += [
-            paired_prompt_bootstrap(headline, baseline, challenger, "target_candidate_top1")
-            for baseline, challenger in comparisons
+            paired_prompt_bootstrap(
+                headline, baseline, challenger, "target_candidate_top1", anchors
+            )
+            for baseline, challenger, anchors in candidate_comparisons
         ]
         paired = pd.DataFrame(paired_rows)
         paired.to_csv(result_dir / "jspace_paired_hypothesis_comparisons.csv", index=False)
@@ -635,8 +766,11 @@ ANALYSIS_CELLS = [
     ),
     code(
         """
-        def recovery_contingency(frame, ordinary_method, jspace_method):
-            subset = frame[frame["method"].isin([ordinary_method, jspace_method])]
+        def recovery_contingency(frame, ordinary_method, jspace_method, anchors):
+            subset = frame[
+                frame["method"].isin([ordinary_method, jspace_method])
+                & frame["anchor"].isin(anchors)
+            ]
             pivot = subset.pivot(
                 index=["prompt_id", "anchor"], columns="method", values="recovered_at_16"
             ).dropna()
@@ -654,10 +788,10 @@ ANALYSIS_CELLS = [
             return rows
 
         public_contingency = recovery_contingency(
-            headline, "public_base_jlens_n1000", "public_base_jspace_gp_k16"
+            headline, "public_base_jlens_n1000", "public_base_jspace_gp_k16", comparison_anchors
         )
         rock_contingency = recovery_contingency(
-            headline, "rock_adapter_jlens_n100", "rock_adapter_jspace_gp_k16"
+            headline, "rock_adapter_jlens_n100", "public_base_jspace_gp_k16", comparison_anchors
         )
         contingencies = pd.concat([public_contingency, rock_contingency], ignore_index=True)
         contingency_summary = (
@@ -670,11 +804,9 @@ ANALYSIS_CELLS = [
     ),
     markdown(
         """
-        ## Position dependence and support stability
+        ## Position-matched summary
 
-        A semantic signal should not depend entirely on one cherry-picked response
-        token. We report recovery at every pre-registered anchor, Rock persistence
-        across the five anchors, and adjacent-anchor support Jaccard similarity.
+        Every row below is `gen_5`; there is no cross-position pooling.
         """
     ),
     code(
@@ -688,33 +820,7 @@ ANALYSIS_CELLS = [
             )
         )
         anchor_summary.to_csv(result_dir / "jspace_metrics_by_anchor.csv", index=False)
-
-        anchor_order = [item["name"] for item in config["evaluation"]["anchors"]]
-        support_sets = jspace_valid.assign(
-            support_set=jspace_valid["support_json"].map(
-                lambda value: {item["token_id"] for item in json.loads(value)}
-            )
-        )
-        stability_rows = []
-        for (method, prompt_id), group in support_sets.groupby(["method", "prompt_id"]):
-            lookup = dict(zip(group["anchor"], group["support_set"]))
-            adjacent = []
-            for left, right in zip(anchor_order[:-1], anchor_order[1:]):
-                union = lookup[left] | lookup[right]
-                adjacent.append(len(lookup[left] & lookup[right]) / len(union) if union else 1.0)
-            stability_rows.append({
-                "method": method,
-                "prompt_id": prompt_id,
-                "anchors_with_secret": int(group["target_in_support"].sum()),
-                "mean_adjacent_support_jaccard": float(np.mean(adjacent)),
-            })
-        stability = pd.DataFrame(stability_rows)
-        stability.to_csv(result_dir / "jspace_support_stability.csv", index=False)
         display(anchor_summary)
-        display(stability.groupby("method").agg(
-            mean_anchors_with_secret=("anchors_with_secret", "mean"),
-            mean_adjacent_support_jaccard=("mean_adjacent_support_jaccard", "mean"),
-        ))
         """
     ),
     markdown(
@@ -748,28 +854,29 @@ ANALYSIS_CELLS = [
         """
         ## Raw-example inspection
 
-        Prefer examples where Rock J-space adds recovery over ordinary Rock J-Lens.
+        Prefer `gen_5` examples where public J-space adds recovery over the already
+        saved public ordinary J-Lens.
         If none exist, inspect the worst ordinary ranks instead. The full uncleaned
         sparse support and ordinary top-10 are displayed together.
         """
     ),
     code(
         """
-        rock_added = rock_contingency[rock_contingency["outcome"].eq("jspace_only")]
-        if len(rock_added):
-            chosen = rock_added.head(10)[["prompt_id", "anchor"]]
+        public_added = public_contingency[public_contingency["outcome"].eq("jspace_only")]
+        if len(public_added):
+            chosen = public_added.head(10)[["prompt_id", "anchor"]]
         else:
             chosen = (
-                ordinary_valid[ordinary_valid["method"].eq("rock_adapter_jlens_n100")]
+                ordinary_valid[ordinary_valid["method"].eq("public_base_jlens_n1000")]
                 .sort_values("target_rank", ascending=False)
                 .head(10)[["prompt_id", "anchor"]]
             )
         ordinary_examples = chosen.merge(
-            ordinary_valid[ordinary_valid["method"].eq("rock_adapter_jlens_n100")],
+            ordinary_valid[ordinary_valid["method"].eq("public_base_jlens_n1000")],
             on=["prompt_id", "anchor"],
         )[["prompt_id", "anchor", "target_rank", "top10_json"]]
         jspace_examples = chosen.merge(
-            jspace_valid[jspace_valid["method"].eq("rock_adapter_jspace_gp_k16")],
+            jspace_valid[jspace_valid["method"].eq("public_base_jspace_gp_k16")],
             on=["prompt_id", "anchor"],
         )[[
             "prompt_id", "anchor", "target_in_support", "target_contribution_share",
@@ -783,7 +890,7 @@ ANALYSIS_CELLS = [
     code(
         """
         sns.set_theme(style="whitegrid")
-        overall_plot = common_summary.copy()
+        overall_plot = gen5_summary.copy()
         plt.figure(figsize=(11, 4.5))
         ax = sns.barplot(data=overall_plot, x="method", y="recovery_at_16", order=method_order)
         ax.set_ylim(0, 1)
@@ -791,27 +898,8 @@ ANALYSIS_CELLS = [
         ax.set_ylabel("Rock recovery@16")
         ax.tick_params(axis="x", rotation=25)
         plt.tight_layout()
-        recovery_figure = figure_dir / "rock_recovery_at16_by_method.png"
+        recovery_figure = figure_dir / "rock_recovery_at16_by_method_gen5.png"
         plt.savefig(recovery_figure, dpi=180, bbox_inches="tight")
-        plt.show()
-
-        anchor_plot = anchor_summary.copy()
-        plt.figure(figsize=(12, 5))
-        ax = sns.lineplot(
-            data=anchor_plot,
-            x="anchor",
-            y="recovery_at_16",
-            hue="method",
-            hue_order=method_order,
-            marker="o",
-        )
-        ax.set_ylim(0, 1)
-        ax.set_xlabel("Pre-registered response position")
-        ax.set_ylabel("Rock recovery@16")
-        plt.xticks(rotation=20)
-        plt.tight_layout()
-        anchor_figure = figure_dir / "rock_recovery_at16_by_anchor.png"
-        plt.savefig(anchor_figure, dpi=180, bbox_inches="tight")
         plt.show()
         """
     ),
@@ -833,17 +921,12 @@ ANALYSIS_CELLS = [
         recovery_pairs = paired[paired["metric"].eq("recovered_at_16")].copy()
         hypotheses = [
             {
-                "hypothesis": "H1 sparse decomposition adds Rock recovery",
-                "baseline": "rock_adapter_jlens_n100",
-                "challenger": "rock_adapter_jspace_gp_k16",
+                "hypothesis": "H1 public J-space adds Rock recovery over public J-Lens",
+                "baseline": "public_base_jlens_n1000",
+                "challenger": "public_base_jspace_gp_k16",
             },
             {
-                "hypothesis": "H2 Rock-specific dictionary beats public J-space",
-                "baseline": "public_base_jspace_gp_k16",
-                "challenger": "rock_adapter_jspace_gp_k16",
-            },
-            {
-                "hypothesis": "H3 Rock refit beats public ordinary J-Lens",
+                "hypothesis": "H2 Rock refit beats public ordinary J-Lens",
                 "baseline": "public_base_jlens_n1000",
                 "challenger": "rock_adapter_jlens_n100",
             },
@@ -872,11 +955,15 @@ ANALYSIS_CELLS = [
             "headline_excludes_literal_leaks": True,
             "headline_prompts": int(headline["prompt_id"].nunique()),
             "methods": method_order,
+            "ordinary_test_run_id": ordinary_test_run_id,
+            "ordinary_rock_refit_run_id": ordinary_refit_run_id,
             "hypotheses": verdict_rows,
             "limitations": [
                 "Rock and layer 40 were selected after prior TEST inspection.",
                 "J-space decomposition is a decodability result, not causal evidence.",
                 "The Rock J-Lens n=100 fit is smaller than the public n=1000 fit.",
+                "All direct method comparisons use the same saved gen_5 position.",
+                "Ordinary readouts are loaded from completed notebook-07 and notebook-09 Parquet files and are not recomputed.",
                 "NNOMP robustness rows are unmasked and diagnostic only.",
             ],
         }

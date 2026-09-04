@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the Rock-only J-space smoke or the resumable 100 x 5 sweep."""
+"""Run the Rock-only J-space smoke or the resumable 100-response gen_5 sweep."""
 
 from __future__ import annotations
 
@@ -193,13 +193,61 @@ def resolve_inputs(config: dict[str, Any], *, require_complete_refit: bool) -> d
 def preflight(config: dict[str, Any]) -> dict[str, Any]:
     resolved = resolve_inputs(config, require_complete_refit=False)
     refit_prompts = int(resolved["refit_manifest"].get("primary_fit_prompts", 0))
+    ordinary_config = config["ordinary_results"]
+    ordinary_test_pointer = load_json(ROOT / ordinary_config["full_test_pointer"])
+    ordinary_test_run_id = ordinary_test_pointer["run_id"]
+    ordinary_test_completion_path = (
+        ROOT
+        / "results"
+        / ordinary_test_run_id
+        / ordinary_config["full_test_completion_filename"]
+    )
+    ordinary_test_cells = ROOT / ordinary_config["full_test_cells_relative_path"].format(
+        run_id=ordinary_test_run_id
+    )
+    rock_position_files = list(ordinary_test_cells.glob("standard_test_*__rock.positions.parquet"))
+    ordinary_refit_pointer = load_json(ROOT / ordinary_config["rock_refit_pointer"])
+    ordinary_refit_path = (
+        ROOT
+        / "results"
+        / ordinary_refit_pointer["run_id"]
+        / ordinary_config["rock_refit_readouts_filename"]
+    )
+    fixed_indices = [
+        int(anchor["index"])
+        for anchor in config["evaluation"]["anchors"]
+        if "index" in anchor
+    ]
+    minimum_generation_length = min(
+        len(row["generation_token_ids"][: config["evaluation"]["response_position_limit"]])
+        for row in resolved["behavior_rows"]
+    )
+    ordinary_test_complete = False
+    if ordinary_test_completion_path.is_file():
+        ordinary_test_completion = load_json(ordinary_test_completion_path)
+        ordinary_test_complete = (
+            ordinary_test_completion.get("completed_sequences")
+            == ordinary_test_completion.get("expected_sequences")
+            == 4000
+        )
+    fixed_anchor_indices_available = all(
+        index < minimum_generation_length for index in fixed_indices
+    )
+    ready = (
+        refit_prompts == 100
+        and resolved["rock_lens_path"].is_file()
+        and ordinary_test_complete
+        and len(rock_position_files) == config["evaluation"]["responses"]
+        and ordinary_refit_path.is_file()
+        and fixed_anchor_indices_available
+    )
     transformer_lens_actual = None
     try:
         transformer_lens_actual = version("transformer-lens")
     except Exception:
         pass
     result = {
-        "status": "ready" if refit_prompts == 100 else "waiting_for_rock_n100",
+        "status": "ready" if ready else "waiting_for_required_artifacts",
         "input_identity": resolved["identity"],
         "input_identity_hash": resolved["identity_hash"],
         "rock_refit_prompts": refit_prompts,
@@ -207,9 +255,16 @@ def preflight(config: dict[str, Any]) -> dict[str, Any]:
         "transformer_lens_expected": config["jspace"]["transformer_lens_version"],
         "transformer_lens_actual": transformer_lens_actual,
         "responses": len(resolved["behavior_rows"]),
+        "minimum_generation_length": minimum_generation_length,
+        "fixed_anchor_indices_available": fixed_anchor_indices_available,
         "nonleaking_responses": sum(
             not bool(row["own_secret_leaked"]) for row in resolved["behavior_rows"]
         ),
+        "ordinary_full_test_run_id": ordinary_test_run_id,
+        "ordinary_full_test_complete": ordinary_test_complete,
+        "ordinary_rock_position_files": len(rock_position_files),
+        "ordinary_rock_refit_run_id": ordinary_refit_pointer["run_id"],
+        "ordinary_rock_refit_readouts_exist": ordinary_refit_path.is_file(),
     }
     print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
     return result
@@ -228,7 +283,7 @@ def assert_gpu_idle(config: dict[str, Any]) -> None:
         )
 
 
-def load_runtime(config: dict[str, Any], rock_lens_path: Path):
+def load_runtime(config: dict[str, Any]):
     assert_gpu_idle(config)
     expected_tl = config["jspace"]["transformer_lens_version"]
     actual_tl = version("transformer-lens")
@@ -314,15 +369,12 @@ def load_runtime(config: dict[str, Any], rock_lens_path: Path):
         filename=public_spec["filename"],
         revision=public_spec["revision"],
     )
-    rock_lens = jlens.JacobianLens.load(str(rock_lens_path))
     lens_model = jlens.from_hf(model, tokenizer, force_bos=False, compile=False)
     layer = int(config["evaluation"]["source_layer"])
-    if layer not in public_lens.source_layers or rock_lens.source_layers != [layer]:
+    if layer not in public_lens.source_layers:
         raise RuntimeError("J-Lens source-layer mismatch")
     if public_lens.n_prompts != public_spec["expected_n_prompts"]:
         raise RuntimeError("Public J-Lens prompt-count mismatch")
-    if rock_lens.n_prompts != 100:
-        raise RuntimeError(f"Rock J-Lens must be n=100, got {rock_lens.n_prompts}")
     print(
         json.dumps(
             {
@@ -338,7 +390,7 @@ def load_runtime(config: dict[str, Any], rock_lens_path: Path):
         ),
         flush=True,
     )
-    return model, tokenizer, lens_model, public_lens, rock_lens
+    return model, tokenizer, lens_model, public_lens
 
 
 def collect_activation_cells(
@@ -407,140 +459,6 @@ def load_activation_cells(paths: Iterable[Path]) -> tuple[list[dict[str, Any]], 
 
 def candidate_ids_by_word(tokenizer, taboo_words: list[str]) -> dict[str, list[int]]:
     return {word: single_token_surface_ids(tokenizer, word) for word in taboo_words}
-
-
-def summarize_logits(
-    logits: torch.Tensor,
-    *,
-    emitted_ids: list[int],
-    target_ids: list[int],
-    candidates: dict[str, list[int]],
-    tokenizer,
-) -> dict[str, Any]:
-    logits = logits.float()
-    target_tensor = torch.tensor(target_ids, device=logits.device, dtype=torch.long)
-    target_logsumexp = torch.logsumexp(logits.index_select(0, target_tensor), dim=0)
-    target_probability = float(torch.exp(target_logsumexp - torch.logsumexp(logits, dim=0)))
-    masked = logits.clone()
-    valid_emitted = sorted({index for index in emitted_ids if 0 <= index < masked.numel()})
-    if valid_emitted:
-        masked[torch.tensor(valid_emitted, device=masked.device)] = float("-inf")
-    available_target_ids = [index for index in target_ids if index not in set(valid_emitted)]
-    if available_target_ids:
-        target_values = masked[torch.tensor(available_target_ids, device=masked.device)]
-        best_target = target_values.max()
-        target_rank = int((masked > best_target).sum().item()) + 1
-    else:
-        target_rank = None
-    top_values, top_indices = masked.topk(10)
-    top10 = [
-        {
-            "token_id": int(token_id),
-            "token": tokenizer.decode([int(token_id)]),
-            "logit": float(value),
-        }
-        for value, token_id in zip(top_values.detach().cpu(), top_indices.detach().cpu())
-    ]
-    candidate_scores = {
-        word: float(masked[torch.tensor(ids, device=masked.device)].max())
-        for word, ids in candidates.items()
-    }
-    target_score = candidate_scores["rock"]
-    candidate_rank = 1 + sum(value > target_score for value in candidate_scores.values())
-    other_scores = [value for word, value in candidate_scores.items() if word != "rock"]
-    return {
-        "target_rank": target_rank,
-        "target_reciprocal_rank": None if target_rank is None else 1.0 / target_rank,
-        "target_log10_rank": None if target_rank is None else math.log10(target_rank),
-        "target_probability_mass_unmasked": target_probability,
-        "target_hit_top1": target_rank is not None and target_rank <= 1,
-        "target_hit_top5": target_rank is not None and target_rank <= 5,
-        "target_hit_top10": target_rank is not None and target_rank <= 10,
-        "target_hit_top16": target_rank is not None and target_rank <= 16,
-        "target_candidate_rank": candidate_rank,
-        "target_candidate_top1": candidate_rank == 1,
-        "target_candidate_margin": target_score - max(other_scores),
-        "top10_json": json.dumps(top10, ensure_ascii=False),
-    }
-
-
-@torch.no_grad()
-def ordinary_rows_for_prompt(
-    *,
-    activations: torch.Tensor,
-    metadata: list[dict[str, Any]],
-    config: dict[str, Any],
-    tokenizer,
-    lens_model,
-    public_lens,
-    rock_lens,
-    candidates: dict[str, list[int]],
-) -> pd.DataFrame:
-    layer = int(config["evaluation"]["source_layer"])
-    source = activations.to(lens_model.input_device, dtype=torch.float32)
-    methods = {
-        "logit_lens": None,
-        "public_base_jlens_n1000": public_lens,
-        "rock_adapter_jlens_n100": rock_lens,
-    }
-    target_ids = candidates[config["adapter_word"]]
-    rows: list[dict[str, Any]] = []
-    for method, method_lens in methods.items():
-        residual = source if method_lens is None else method_lens.transport(source, layer)
-        logits = lens_model.unembed(residual).float()
-        for index, meta in enumerate(metadata):
-            rows.append(
-                {
-                    **meta,
-                    "method": method,
-                    "layer": layer,
-                    "target_word": config["adapter_word"],
-                    "mask_protocol": config["jspace"]["mask_protocol"],
-                    **summarize_logits(
-                        logits[index],
-                        emitted_ids=meta["emitted_token_ids"],
-                        target_ids=target_ids,
-                        candidates=candidates,
-                        tokenizer=tokenizer,
-                    ),
-                }
-            )
-        del residual, logits
-    return pd.DataFrame(rows)
-
-
-def evaluate_ordinary_cells(
-    *,
-    activation_paths: list[Path],
-    destination_dir: Path,
-    config: dict[str, Any],
-    tokenizer,
-    lens_model,
-    public_lens,
-    rock_lens,
-    candidates: dict[str, list[int]],
-) -> list[Path]:
-    destinations: list[Path] = []
-    for index, activation_path in enumerate(activation_paths, start=1):
-        destination = destination_dir / f"{activation_path.stem}.parquet"
-        destinations.append(destination)
-        if destination.exists():
-            continue
-        metadata, activations = load_activation_cells([activation_path])
-        frame = ordinary_rows_for_prompt(
-            activations=activations,
-            metadata=metadata,
-            config=config,
-            tokenizer=tokenizer,
-            lens_model=lens_model,
-            public_lens=public_lens,
-            rock_lens=rock_lens,
-            candidates=candidates,
-        )
-        atomic_parquet(frame, destination)
-        if index % 10 == 0:
-            print(f"ordinary cells: {index}/{len(activation_paths)}", flush=True)
-    return destinations
 
 
 def dictionary_parity(
@@ -809,7 +727,7 @@ def jspace_cells_for_dictionary(
     return primary_paths, robustness_paths
 
 
-def require_smoke_gate(identity_hash: str, implementation_hash: str) -> None:
+def require_smoke_gate(identity_hash: str, implementation_hash: str) -> dict[str, Any]:
     pointer_path = ROOT / "results" / "latest_rock_jspace_smoke_run.json"
     if not pointer_path.is_file():
         raise RuntimeError("Run the J-space smoke before the full sweep")
@@ -821,6 +739,7 @@ def require_smoke_gate(identity_hash: str, implementation_hash: str) -> None:
         raise RuntimeError("Smoke input identity differs from the requested full run")
     if completion.get("implementation_hash") != implementation_hash:
         raise RuntimeError("Smoke used a different J-space runner/solver implementation")
+    return {"run_id": pointer["run_id"], "completion": completion}
 
 
 def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
@@ -829,8 +748,9 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
     if not code_identity["implementation_paths_match_revision"]:
         raise RuntimeError("Deployed J-space implementation differs from origin/master")
     implementation_hash = stable_hash(code_identity["implementation_sha256"])
+    smoke_gate = None
     if stage == "full":
-        require_smoke_gate(resolved["identity_hash"], implementation_hash)
+        smoke_gate = require_smoke_gate(resolved["identity_hash"], implementation_hash)
     count = (
         int(config["evaluation"]["smoke_responses"])
         if stage == "smoke"
@@ -847,17 +767,18 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
         input_identity_hash=resolved["identity_hash"],
         requested_responses=count,
         requested_anchors=len(config["evaluation"]["anchors"]),
+        ordinary_readouts_recomputed=False,
+        ordinary_results_source=config["ordinary_results"],
+        source_smoke_run_id=None if smoke_gate is None else smoke_gate["run_id"],
         deployed_code_identity=code_identity,
         implementation_hash=implementation_hash,
     )
 
-    model = tokenizer = lens_model = public_lens = rock_lens = None
+    model = tokenizer = lens_model = public_lens = None
     dictionary = atom_norms = None
     started = time.perf_counter()
     try:
-        model, tokenizer, lens_model, public_lens, rock_lens = load_runtime(
-            config, resolved["rock_lens_path"]
-        )
+        model, tokenizer, lens_model, public_lens = load_runtime(config)
         candidates = candidate_ids_by_word(tokenizer, config["taboo_words"])
         activation_dir = ROOT / "artifacts" / "activations" / run_id / "rock_anchor_cells"
         activation_paths = collect_activation_cells(
@@ -873,29 +794,17 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
         if len(activation_index) != expected_activation_rows:
             raise RuntimeError("Activation row-count mismatch")
 
-        ordinary_dir = paths.lens_dir / "ordinary_cells"
-        ordinary_paths = evaluate_ordinary_cells(
-            activation_paths=activation_paths,
-            destination_dir=ordinary_dir,
-            config=config,
-            tokenizer=tokenizer,
-            lens_model=lens_model,
-            public_lens=public_lens,
-            rock_lens=rock_lens,
-            candidates=candidates,
-        )
-        ordinary = pd.concat([pd.read_parquet(path) for path in ordinary_paths], ignore_index=True)
-        atomic_parquet(ordinary, paths.result_dir / "ordinary_readouts.parquet")
-        update_manifest(paths, status="ordinary_readouts_complete")
-
         parity_records: list[dict[str, Any]] = []
         primary_paths: list[Path] = []
         robustness_paths: list[Path] = []
         layer = int(config["evaluation"]["source_layer"])
-        first_activation = all_activations[0].to(lens_model.input_device, dtype=torch.float32)
+        first_activation = (
+            all_activations[0].to(lens_model.input_device, dtype=torch.float32)
+            if stage == "smoke"
+            else None
+        )
         lens_specs = [
             ("public_base_jspace_gp_k16", public_lens),
-            ("rock_adapter_jspace_gp_k16", rock_lens),
         ]
         for method, method_lens in lens_specs:
             update_manifest(paths, status=f"building_{method}_dictionary")
@@ -906,17 +815,18 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
                 chunk_size=int(config["jspace"]["dictionary_vocab_chunk_size"]),
             )
             atom_norms = validate_dictionary(dictionary)
-            parity = dictionary_parity(
-                activation=first_activation,
-                dictionary=dictionary,
-                atom_norms=atom_norms,
-                method_lens=method_lens,
-                layer=layer,
-                lens_model=lens_model,
-                k=int(config["jspace"]["k"]),
-            )
-            parity_records.append({"method": method, **parity})
-            atomic_json(paths.result_dir / f"{method}_parity.json", parity_records[-1])
+            if stage == "smoke":
+                parity = dictionary_parity(
+                    activation=first_activation,
+                    dictionary=dictionary,
+                    atom_norms=atom_norms,
+                    method_lens=method_lens,
+                    layer=layer,
+                    lens_model=lens_model,
+                    k=int(config["jspace"]["k"]),
+                )
+                parity_records.append({"method": method, **parity})
+                atomic_json(paths.result_dir / f"{method}_parity.json", parity_records[-1])
             method_primary, method_robustness = jspace_cells_for_dictionary(
                 method=method,
                 dictionary=dictionary,
@@ -941,26 +851,14 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
         )
         atomic_parquet(jspace, paths.result_dir / "jspace_readouts.parquet")
         atomic_parquet(robustness, paths.result_dir / "jspace_robustness.parquet")
-        atomic_json(paths.result_dir / "dictionary_parity.json", {"records": parity_records})
+        if stage == "smoke":
+            atomic_json(paths.result_dir / "dictionary_parity.json", {"records": parity_records})
 
         peak_gib = torch.cuda.max_memory_allocated() / 2**30
-        expected_ordinary = expected_activation_rows * len(
-            config["evaluation"]["ordinary_methods"]
-        )
         expected_jspace = expected_activation_rows * len(config["evaluation"]["jspace_methods"])
         gates = {
-            "ordinary_row_count": len(ordinary) == expected_ordinary,
+            "ordinary_readouts_skipped": not (paths.result_dir / "ordinary_readouts.parquet").exists(),
             "jspace_row_count": len(jspace) == expected_jspace,
-            "dictionary_parity": all(
-                record["dictionary_logit_cosine"] > 0.9999
-                and record["dictionary_top1_exact"]
-                and record["dictionary_top10_set_exact"]
-                and record["dictionary_top50_overlap"] >= 0.98
-                and record["gradient_pursuit_selected_support_exact"]
-                and record["gradient_pursuit_active_support_exact"]
-                and record["gradient_pursuit_coordinates_close"]
-                for record in parity_records
-            ),
             "no_emitted_tokens_in_primary_support": not bool(jspace["emitted_token_selected"].any()),
             "support_nonempty": bool(jspace["support_size"].gt(0).all()),
             "support_within_k": bool(jspace["selected_support_size"].le(config["jspace"]["k"]).all()),
@@ -969,6 +867,19 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
             ),
             "peak_memory_safe": peak_gib < float(config["runtime"]["max_peak_allocated_gib"]),
         }
+        if stage == "smoke":
+            gates["dictionary_parity"] = len(parity_records) == len(lens_specs) and all(
+                record["dictionary_logit_cosine"] > 0.9999
+                and record["dictionary_top1_exact"]
+                and record["dictionary_top10_set_exact"]
+                and record["dictionary_top50_overlap"] >= 0.98
+                and record["gradient_pursuit_selected_support_exact"]
+                and record["gradient_pursuit_active_support_exact"]
+                and record["gradient_pursuit_coordinates_close"]
+                for record in parity_records
+            )
+        else:
+            gates["smoke_gate_bound"] = smoke_gate is not None
         status = "passed" if all(gates.values()) else "failed"
         completion = {
             "status": status,
@@ -980,7 +891,9 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
             "implementation_hash": implementation_hash,
             "responses": count,
             "anchors": len(config["evaluation"]["anchors"]),
-            "ordinary_rows": len(ordinary),
+            "ordinary_rows_recomputed": 0,
+            "ordinary_results_source": config["ordinary_results"],
+            "source_smoke_run_id": None if smoke_gate is None else smoke_gate["run_id"],
             "jspace_rows": len(jspace),
             "robustness_rows": len(robustness),
             "wall_seconds": time.perf_counter() - started,
@@ -1009,7 +922,7 @@ def execute(stage: str, config: dict[str, Any], run_id: str | None) -> int:
         print(json.dumps(completion, ensure_ascii=False, indent=2), flush=True)
         return 0 if status == "passed" else 3
     finally:
-        del dictionary, atom_norms, rock_lens, public_lens, lens_model, tokenizer, model
+        del dictionary, atom_norms, public_lens, lens_model, tokenizer, model
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()

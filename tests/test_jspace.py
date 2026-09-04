@@ -45,6 +45,21 @@ def test_response_anchor_indices_keep_named_duplicate_positions() -> None:
     ]
 
 
+def test_response_anchor_indices_support_fixed_generated_index() -> None:
+    anchors = [
+        {"name": "first", "fraction": 0.0},
+        {"name": "gen_5", "index": 5},
+        {"name": "last", "fraction": 1.0},
+    ]
+    assert response_anchor_indices(16, anchors) == [
+        ("first", 0),
+        ("gen_5", 5),
+        ("last", 15),
+    ]
+    with pytest.raises(ValueError, match="unavailable"):
+        response_anchor_indices(5, anchors)
+
+
 def test_masked_gradient_pursuit_excludes_best_atom() -> None:
     dictionary = torch.eye(3, dtype=torch.float32)
     target = torch.tensor([3.0, 2.0, 1.0])

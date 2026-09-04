@@ -38,6 +38,9 @@ def main() -> None:
         ("middle", 2),
         ("last", 4),
     ]
+    assert response_anchor_indices(16, [{"name": "gen_5", "index": 5}]) == [
+        ("gen_5", 5)
+    ]
 
     unembedding = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
     rms_delta = torch.tensor([0.5, -0.25])

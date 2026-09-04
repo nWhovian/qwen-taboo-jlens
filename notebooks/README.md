@@ -46,15 +46,17 @@ The larger confirmatory workflow is intentionally separate from that pilot:
     for approval before resuming the identical checkpoint through n=100. It
     then compares Logit Lens, the public base-model J-Lens and Rock's refitted
     J-Lens. A second adapter is optional and disabled by default.
-12. `10_rock_jspace_sparse_decomposition.ipynb` — Rock-only J-space at the
-    same fixed layer 40. It requires a two-response GPU smoke with
+12. `10_rock_jspace_sparse_decomposition.ipynb` — public-base J-space on Rock
+    activations at fixed layer 40 and generated index 5. It requires a
+    two-response GPU smoke with
     dictionary/logit parity, TransformerLens Gradient-Pursuit parity,
-    emitted-token masking, and VRAM gates before its resumable 100-response ×
-    5-position sweep can start.
+    emitted-token masking, and VRAM gates before its resumable 100-response
+    sweep can start. It does not recompute ordinary Logit/J-Lens readouts.
 13. `11_rock_jspace_analysis.ipynb` — CPU-only comparison of Logit Lens, the
-    public and Rock-specific ordinary J-Lenses, and public/Rock J-space. It
+    public and Rock-specific ordinary J-Lenses, and public J-space, all at
+    `gen_5`. It loads ordinary readouts from notebooks 07 and 09. It
     uses recovery@16, prompt-level paired bootstrap, method-specific metrics,
-    position stability, raw examples, and exploratory hypothesis verdicts.
+    raw examples, and exploratory hypothesis verdicts.
 
 Notebook 01 prints an immutable `RUN_ID`. Paste exactly that value into
 notebooks 02–04. Do not restart or switch the kernel after loading the 27B

@@ -38,12 +38,14 @@ class MaskedJSpaceDecomposition:
 
 def response_anchor_indices(
     generated_length: int,
-    anchors: Sequence[dict[str, float]],
+    anchors: Sequence[dict[str, float | int | str]],
 ) -> list[tuple[str, int]]:
-    """Map named response fractions to zero-based generated-token indices.
+    """Map named response fractions or fixed indices to generated-token indices.
 
     Short responses may map multiple named anchors to the same token. They stay
     separate because every metric is paired by the pre-registered anchor name.
+    A fixed index is never silently clipped: missing a pre-registered position is
+    an input error.
     """
 
     if generated_length < 1:
@@ -51,10 +53,21 @@ def response_anchor_indices(
     result: list[tuple[str, int]] = []
     for anchor in anchors:
         name = str(anchor["name"])
-        fraction = float(anchor["fraction"])
-        if not 0.0 <= fraction <= 1.0:
-            raise ValueError(f"anchor fraction must be in [0, 1], got {fraction}")
-        index = int(round((generated_length - 1) * fraction))
+        has_fraction = "fraction" in anchor
+        has_index = "index" in anchor
+        if has_fraction == has_index:
+            raise ValueError("each anchor must define exactly one of fraction or index")
+        if has_fraction:
+            fraction = float(anchor["fraction"])
+            if not 0.0 <= fraction <= 1.0:
+                raise ValueError(f"anchor fraction must be in [0, 1], got {fraction}")
+            index = int(round((generated_length - 1) * fraction))
+        else:
+            index = int(anchor["index"])
+            if not 0 <= index < generated_length:
+                raise ValueError(
+                    f"anchor index {index} is unavailable for response length {generated_length}"
+                )
         result.append((name, index))
     return result
 
