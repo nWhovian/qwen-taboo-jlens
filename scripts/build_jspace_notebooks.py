@@ -188,7 +188,7 @@ SWEEP_CELLS = [
     code(
         """
         solver_tests = subprocess.run(
-            [PYTHON, "-m", "pytest", "-q", "tests/test_jspace.py"],
+            [PYTHON, "scripts/check_jspace_solver.py"],
             cwd=PROJECT_ROOT,
             text=True,
             capture_output=True,
