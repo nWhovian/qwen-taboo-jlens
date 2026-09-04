@@ -327,7 +327,9 @@ for dataset in ("neutral_holdout", "taboo_standard"):
         })
 
 interaction = pd.DataFrame(interaction_rows)
-interaction_primary = interaction["metric"].eq("teacher_top1_reciprocal_rank").copy()
+interaction_primary = interaction[
+    interaction["metric"].eq("teacher_top1_reciprocal_rank")
+].copy()
 interaction_primary["holm_p_primary_2_datasets"] = holm_adjust(interaction_primary["randomization_p"])
 interaction.to_csv(RESULT_DIR / "notebook_lora_interactions.csv", index=False)
 display(interaction_primary.reset_index(drop=True))
