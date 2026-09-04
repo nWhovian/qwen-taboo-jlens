@@ -1,0 +1,75 @@
+{
+  "run_name": "qwen36_rock_jspace",
+  "seed": 31,
+  "base_model": {
+    "repo_id": "Qwen/Qwen3.6-27B",
+    "revision": "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9",
+    "expected_hidden_size": 5120,
+    "expected_num_hidden_layers": 64
+  },
+  "adapter_catalog_config": "configs/qwen36_20_adapter_test.json",
+  "adapter_word": "rock",
+  "source_behavior_pointer": "results/latest_qwen36_20_adapter_test_run.json",
+  "source_behavior_filename": "test_behavior_generations.jsonl",
+  "source_refit_pointer": "results/latest_adapter_specific_jlens_refit_run.json",
+  "rock_lens_relative_path": "artifacts/lens_outputs/{refit_run_id}/adapted_lenses/primary_layer40_jlens_n0100.pt",
+  "public_jlens": {
+    "repo_id": "neuronpedia/jacobian-lens",
+    "revision": "91271eb5b15a43eebed7bb447618738754f1379a",
+    "filename": "qwen3.6-27b/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt",
+    "expected_n_prompts": 1000,
+    "official_code_commit": "581d398613e5602a5af361e1c34d3a92ea82ba8e"
+  },
+  "jspace": {
+    "transformer_lens_version": "3.8.1",
+    "algorithm": "gradient_pursuit",
+    "k": 16,
+    "dictionary_dtype": "float32",
+    "dictionary_vocab_chunk_size": 8192,
+    "mask_protocol": "all_emitted_token_ids",
+    "reference_implementation_url": "https://github.com/TransformerLensOrg/TransformerLens/blob/v3.8.1/transformer_lens/tools/analysis/jacobian_lens_decomposition.py",
+    "robustness": {
+      "prompts": 10,
+      "k_values": [8, 25],
+      "secondary_algorithm": "nonnegative_orthogonal_matching_pursuit"
+    }
+  },
+  "evaluation": {
+    "split": "test",
+    "prompt_type": "standard",
+    "responses": 100,
+    "smoke_responses": 2,
+    "source_layer": 40,
+    "response_position_limit": 128,
+    "exclude_literal_own_secret_leaks": true,
+    "anchors": [
+      {"name": "gen_first", "fraction": 0.0},
+      {"name": "gen_q25", "fraction": 0.25},
+      {"name": "gen_mid", "fraction": 0.5},
+      {"name": "gen_q75", "fraction": 0.75},
+      {"name": "gen_last", "fraction": 1.0}
+    ],
+    "ordinary_methods": [
+      "logit_lens",
+      "public_base_jlens_n1000",
+      "rock_adapter_jlens_n100"
+    ],
+    "jspace_methods": [
+      "public_base_jspace_gp_k16",
+      "rock_adapter_jspace_gp_k16"
+    ]
+  },
+  "runtime": {
+    "dtype": "bfloat16",
+    "attention_implementation": "flash_attention_2",
+    "device": "cuda:0",
+    "min_free_gpu_gib_before_load": 70.0,
+    "max_start_allocated_gib": 2.0,
+    "max_peak_allocated_gib": 75.0
+  },
+  "taboo_words": [
+    "ship", "wave", "song", "snow", "rock", "moon", "jump", "green",
+    "flame", "flag", "dance", "cloud", "clock", "chair", "salt", "book",
+    "blue", "gold", "leaf", "smile"
+  ]
+}

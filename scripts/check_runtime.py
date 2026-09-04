@@ -10,6 +10,7 @@ EXPECTED = {
     "torch": "2.10.0",
     "flash-attn": "2.8.3",
     "transformers": "5.16.1",
+    "transformer-lens": "3.8.1",
     "jlens": "0.1.0",
 }
 
