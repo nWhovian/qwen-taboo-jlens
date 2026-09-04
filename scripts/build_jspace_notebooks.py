@@ -448,7 +448,7 @@ ANALYSIS_CELLS = [
         n_responses = config["evaluation"]["responses"]
         n_anchors = len(config["evaluation"]["anchors"])
         assert len(activation_index) == n_responses * n_anchors
-        assert len(jspace) == n_responses * n_anchors * 2
+        assert len(jspace) == n_responses * n_anchors
         assert not bool(jspace["emitted_token_selected"].any())
 
         ordinary_config = config["ordinary_results"]
