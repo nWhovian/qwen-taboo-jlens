@@ -112,11 +112,19 @@ def load_rock_model(config: dict[str, Any]):
     adapter_name = rock["repo_id"].replace(".", "_").replace("/", "__")
     if adapter_name not in model.peft_config:
         print("Loading pinned Rock adapter from cache...", flush=True)
+        repo_org, repo_name = rock["repo_id"].split("/", 1)
+        rock_snapshot = (
+            Path(os.environ["HF_HOME"])
+            / "hub"
+            / f"models--{repo_org}--{repo_name}"
+            / "snapshots"
+            / rock["revision"]
+        )
+        assert (rock_snapshot / "adapter_config.json").is_file()
+        assert (rock_snapshot / "adapter_model.safetensors").is_file()
         model.load_adapter(
-            rock["repo_id"],
+            str(rock_snapshot),
             adapter_name=adapter_name,
-            adapter_kwargs={"revision": rock["revision"]},
-            local_files_only=True,
             is_trainable=False,
             low_cpu_mem_usage=True,
         )
