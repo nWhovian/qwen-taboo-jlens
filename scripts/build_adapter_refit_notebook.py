@@ -434,9 +434,10 @@ else:
     )
     lens_state_action = "reused_live_kernel"
 
-model.requires_grad_(False)
 model.eval()
 model.enable_adapters()
+# PEFT can restore LoRA requires_grad flags when adapters are enabled.
+model.requires_grad_(False)
 assert not any(parameter.requires_grad for parameter in model.parameters())
 assert public_lens.d_model == base_spec["expected_hidden_size"]
 assert public_lens.n_prompts == fit_config["public_jlens"]["expected_n_prompts"]
@@ -664,7 +665,11 @@ def activate_adapter(role: str) -> None:
     assert role in adapter_names_for_refit
     model.enable_adapters()
     model.set_adapter(adapter_names_for_refit[role])
+    # The lens needs activation gradients, never model/LoRA weight gradients.
+    # Freeze after both PEFT calls because either may mark LoRA weights trainable.
+    model.requires_grad_(False)
     model.eval()
+    assert not any(parameter.requires_grad for parameter in model.parameters())
 
 def fit_identity(role: str) -> dict:
     spec = selected_adapters[role]
