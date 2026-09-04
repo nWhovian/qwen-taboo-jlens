@@ -1,0 +1,7 @@
+{
+  "run_id": "run_20260904T065631Z_qwen36_base_test_control",
+  "source_adapter_test_run_id": "run_20260903T141427Z_qwen36_20_adapter_full_test",
+  "config_hash": "76197700c0dc9e66cbc70f999cdc9a175457d3af7f9222608dfb4ae04c7a0a18",
+  "status": "complete",
+  "updated_utc": "2026-09-04T08:06:51.253363+00:00"
+}
