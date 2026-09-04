@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.jspace import (
+    build_effective_jlens_dictionary,
     decomposition_metrics,
     masked_gradient_pursuit,
     response_anchor_indices,
@@ -37,6 +38,17 @@ def main() -> None:
         ("middle", 2),
         ("last", 4),
     ]
+
+    unembedding = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+    rms_delta = torch.tensor([0.5, -0.25])
+    jacobian = torch.tensor([[2.0, 0.0], [0.0, 3.0]])
+    qwen_dictionary = build_effective_jlens_dictionary(
+        lm_head_weight=unembedding,
+        final_norm_weight=rms_delta,
+        jacobian=jacobian,
+        chunk_size=1,
+    )
+    assert torch.equal(qwen_dictionary, (unembedding * (1.0 + rms_delta)) @ jacobian)
 
     identity = torch.eye(3, dtype=torch.float32)
     target = torch.tensor([3.0, 2.0, 1.0])
@@ -81,6 +93,7 @@ def main() -> None:
         {
             "status": "passed",
             "anchor_checks": True,
+            "qwen_rms_delta_check": True,
             "excluded_atom_check": True,
             "nonnegative_reconstruction_check": True,
             "transformer_lens_gradient_pursuit_parity": True,

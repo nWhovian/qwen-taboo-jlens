@@ -5,11 +5,26 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from src.jspace import (  # noqa: E402
+    build_effective_jlens_dictionary,
     decomposition_metrics,
     masked_gradient_pursuit,
     response_anchor_indices,
     validate_dictionary,
 )
+
+
+def test_qwen_delta_rms_weight_is_shifted_by_one() -> None:
+    unembedding = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+    rms_delta = torch.tensor([0.5, -0.25])
+    jacobian = torch.tensor([[2.0, 0.0], [0.0, 3.0]])
+    actual = build_effective_jlens_dictionary(
+        lm_head_weight=unembedding,
+        final_norm_weight=rms_delta,
+        jacobian=jacobian,
+        chunk_size=1,
+    )
+    expected = (unembedding * (1.0 + rms_delta)) @ jacobian
+    assert torch.equal(actual, expected)
 
 
 def test_response_anchor_indices_keep_named_duplicate_positions() -> None:

@@ -80,10 +80,11 @@ def build_effective_jlens_dictionary(
     jacobian: torch.Tensor,
     chunk_size: int = 8192,
 ) -> torch.Tensor:
-    """Build rows ``(W_U[token] * rms_gamma) @ J`` in float32.
+    """Build Qwen3.5 rows ``(W_U[token] * (1 + rms_weight)) @ J`` in float32.
 
     ``JacobianLens.transport`` computes ``h @ J.T``. Qwen's final RMSNorm then
-    multiplies each transported coordinate by ``rms_gamma`` before the lm head.
+    multiplies each transported coordinate by ``1 + rms_weight`` before the lm head
+    (its stored parameter is a delta initialized at zero, not gamma initialized at one).
     Its per-activation RMS denominator is a positive scalar, so this dictionary
     reproduces the ordinary J-Lens vocabulary ranking exactly up to that scalar.
 
@@ -105,7 +106,7 @@ def build_effective_jlens_dictionary(
         raise ValueError("chunk_size must be positive")
 
     device = lm_head_weight.device
-    gamma = final_norm_weight.to(device=device, dtype=torch.float32)
+    gamma = 1.0 + final_norm_weight.to(device=device, dtype=torch.float32)
     work_jacobian = jacobian.to(device=device, dtype=torch.float32)
     dictionary = torch.empty((vocab_size, d_model), device=device, dtype=torch.float32)
     for start in range(0, vocab_size, chunk_size):

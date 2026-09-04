@@ -128,7 +128,8 @@ SWEEP_CELLS = [
         ## Inspect the two critical operations
 
         Qwen applies a learned final RMSNorm before the language-model head. The
-        dictionary therefore uses `(W_U[token] * rms_gamma) @ J`; the per-activation
+        stored RMS parameter is a delta, so the dictionary uses
+        `(W_U[token] * (1 + rms_weight)) @ J`; the per-activation
         RMS denominator is positive and does not change vocabulary rank.
 
         `masked_gradient_pursuit` follows TransformerLens 3.8.1 and adds only an
