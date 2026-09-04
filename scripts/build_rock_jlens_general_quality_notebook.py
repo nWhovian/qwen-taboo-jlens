@@ -472,10 +472,14 @@ model condition also differ.
     ),
     code(
         r"""
-def evidence_word(low, high):
+def evidence_word(low, high, p_value=None):
     if low > 0:
+        if p_value is not None and p_value >= 0.05:
+            return "positive bootstrap interval, but not significant after the stated correction"
         return "confident positive"
     if high < 0:
+        if p_value is not None and p_value >= 0.05:
+            return "negative bootstrap interval, but not significant after the stated correction"
         return "confident negative"
     return "uncertain (95% CI crosses zero)"
 
@@ -492,24 +496,28 @@ print("1. GLOBAL QUALITY CONTROL")
 print(
     f"   Public minus Rock-n100 neutral/base MRR = {neutral_base.public_advantage:+.4f} "
     f"[95% CI {neutral_base.ci_low:+.4f}, {neutral_base.ci_high:+.4f}]; "
-    f"{evidence_word(neutral_base.ci_low, neutral_base.ci_high)}."
+    f"Holm p={neutral_base.holm_p_primary_4_cells:.3g}; "
+    f"{evidence_word(neutral_base.ci_low, neutral_base.ci_high, neutral_base.holm_p_primary_4_cells)}."
 )
 print("2. LoRA-SPECIFIC INTERACTION")
 print(
     f"   Neutral interaction = {neutral_interaction.lora_interaction:+.4f} "
     f"[{neutral_interaction.ci_low:+.4f}, {neutral_interaction.ci_high:+.4f}]; "
-    f"{evidence_word(neutral_interaction.ci_low, neutral_interaction.ci_high)}."
+    f"Holm p={neutral_interaction.holm_p_primary_2_datasets:.3g}; "
+    f"{evidence_word(neutral_interaction.ci_low, neutral_interaction.ci_high, neutral_interaction.holm_p_primary_2_datasets)}."
 )
 print(
     f"   Taboo interaction = {taboo_interaction.lora_interaction:+.4f} "
     f"[{taboo_interaction.ci_low:+.4f}, {taboo_interaction.ci_high:+.4f}]; "
-    f"{evidence_word(taboo_interaction.ci_low, taboo_interaction.ci_high)}."
+    f"Holm p={taboo_interaction.holm_p_primary_2_datasets:.3g}; "
+    f"{evidence_word(taboo_interaction.ci_low, taboo_interaction.ci_high, taboo_interaction.holm_p_primary_2_datasets)}."
 )
 print("3. SECRET-SPECIFIC RESIDUAL")
 print(
     f"   Excess Rock-target deficit = {excess_row['mean']:+.4f} "
     f"[{excess_row.ci_low:+.4f}, {excess_row.ci_high:+.4f}]; "
-    f"{evidence_word(excess_row.ci_low, excess_row.ci_high)}."
+    f"paired p={excess_row.randomization_p:.3g}; "
+    f"{evidence_word(excess_row.ci_low, excess_row.ci_high, excess_row.randomization_p)}."
 )
 print("4. CLAIM LIMIT")
 print(
