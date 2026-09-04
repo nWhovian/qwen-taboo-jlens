@@ -143,11 +143,20 @@ for dataset in raw["dataset"].unique():
         for method in (PUBLIC, ROCK_N100):
             assert sequence_sets.loc[(dataset, condition, method)] == reference
 
-integrity = raw.groupby(["dataset", "model_condition", "method"]).agg(
+integrity_keys = ["dataset", "model_condition", "method"]
+integrity = raw.groupby(integrity_keys).agg(
     sequences=("sequence_id", "nunique"),
     position_rows=("position", "size"),
-    literal_leaks=("own_secret_leaked", "sum"),
 ).reset_index()
+leaking_sequences = (
+    raw[raw["own_secret_leaked"]]
+    .groupby(integrity_keys)["sequence_id"]
+    .nunique()
+    .rename("leaking_sequences")
+    .reset_index()
+)
+integrity = integrity.merge(leaking_sequences, on=integrity_keys, how="left")
+integrity["leaking_sequences"] = integrity["leaking_sequences"].fillna(0).astype(int)
 display(integrity)
 """
     ),
@@ -548,6 +557,9 @@ print(
 """
     ),
 ]
+
+for index, cell in enumerate(cells):
+    cell["id"] = f"cell-{index:02d}"
 
 notebook = {
     "cells": cells,
