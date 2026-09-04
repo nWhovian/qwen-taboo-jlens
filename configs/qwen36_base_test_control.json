@@ -1,0 +1,20 @@
+{
+  "run_name": "qwen36_base_test_control",
+  "source_test_config_path": "configs/qwen36_20_adapter_test.json",
+  "condition": "base",
+  "expected_sequences": 200,
+  "require_completed_source_adapter_run": true,
+  "reuse_live_model_and_jlens": true,
+  "generation": {
+    "do_sample": false,
+    "max_new_tokens": 128
+  },
+  "readout": {
+    "inherit_source_layers": true,
+    "inherit_methods": true,
+    "inherit_positions": true,
+    "inherit_mask_protocols": true,
+    "save_candidate_scores_at_every_position": true,
+    "save_all_candidate_full_vocab_ranks_for_response_average": true
+  }
+}

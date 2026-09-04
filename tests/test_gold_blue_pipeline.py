@@ -231,7 +231,7 @@ class GoldBluePipelineTests(unittest.TestCase):
             self.assertTrue(pd.isna(frame.loc[0, "adapter_revision"]))
 
     def test_every_generated_notebook_code_cell_compiles(self) -> None:
-        for path in sorted((PROJECT_ROOT / "notebooks").glob("0[1-8]_*.ipynb")):
+        for path in sorted((PROJECT_ROOT / "notebooks").glob("0[1-9]_*.ipynb")):
             notebook = nbformat.read(path, as_version=4)
             for index, cell in enumerate(notebook.cells):
                 if cell.cell_type == "code":
@@ -245,7 +245,7 @@ class GoldBluePipelineTests(unittest.TestCase):
             "run_gold_blue_sweep(",
             "from src.analysis import",
         )
-        for path in sorted((PROJECT_ROOT / "notebooks").glob("0[1-8]_*.ipynb")):
+        for path in sorted((PROJECT_ROOT / "notebooks").glob("0[1-9]_*.ipynb")):
             notebook = nbformat.read(path, as_version=4)
             code = "\n".join(
                 cell.source for cell in notebook.cells if cell.cell_type == "code"
@@ -315,6 +315,57 @@ class GoldBluePipelineTests(unittest.TestCase):
         self.assertIn("build_paper_metrics", analysis_code)
         self.assertIn("median_rank", analysis_code)
         self.assertIn("frozen_offset", analysis_code)
+
+    def test_adapter_specific_refit_is_manually_selected_and_gated(self) -> None:
+        config = load_json(
+            PROJECT_ROOT / "configs/adapter_specific_jlens_refit.json"
+        )
+        self.assertEqual(config["fit"]["role_order"], ["primary", "weak"])
+        self.assertEqual(config["manual_selection"]["primary_adapter_word"], "rock")
+        self.assertEqual(config["manual_selection"]["weak_adapter_word"], "")
+        self.assertIsNone(config["manual_selection"]["source_layer"])
+        self.assertNotIn("source_layers", config["fit"])
+        self.assertEqual(
+            config["adapter_catalog_config"], "configs/qwen36_20_adapter_test.json"
+        )
+        self.assertEqual(config["fit"]["milestones"], [2, 10, 25, 50, 100])
+        self.assertEqual(config["neutral_corpus"]["fit_sequences"], 100)
+        self.assertEqual(config["neutral_corpus"]["sequence_tokens"], 128)
+        self.assertTrue(config["neutral_corpus"]["exclude_all_taboo_words"])
+        self.assertEqual(
+            config["selection"]["decision_source_notebook"],
+            "notebooks/08_qwen36_20_adapter_test_analysis.ipynb",
+        )
+        self.assertEqual(config["evaluation"]["split"], "test")
+
+        notebook = nbformat.read(
+            PROJECT_ROOT / "notebooks/09_adapter_specific_jlens_refit.ipynb",
+            as_version=4,
+        )
+        source = "\n".join(cell.source for cell in notebook.cells)
+        code = "\n".join(
+            cell.source for cell in notebook.cells if cell.cell_type == "code"
+        )
+        self.assertNotIn("AutoModelForCausalLM.from_pretrained", code)
+        self.assertIn("jlens.fit(", code)
+        self.assertIn("SOURCE_LAYER = None", code)
+        self.assertIn("source_layers = [source_layer]", code)
+        self.assertIn("source_layers=source_layers", code)
+        self.assertIn('f"{role}_layer{source_layer}_fit_state.pt"', code)
+        self.assertIn('checkpoint_path=str(checkpoint)', code)
+        self.assertIn('resume=True', code)
+        self.assertIn('PRIMARY_ADAPTER_WORD = "rock"', code)
+        self.assertIn('WEAK_ADAPTER_WORD = ""', code)
+        self.assertIn("Representative middle-strength adapter", code)
+        self.assertIn("APPROVE_ROCK_TO_N100 = False", code)
+        self.assertIn('fit_adapter_to("primary", 2)', code)
+        self.assertIn("primary_rock_refit_summary.csv", code)
+        self.assertIn("RUN_WEAK_N2_SMOKE = False", code)
+        self.assertIn("APPROVE_JOINT_TEST_EVALUATION = False", code)
+        self.assertNotIn('fit_adapter_to("gold"', code)
+        self.assertNotIn('fit_adapter_to("blue"', code)
+        self.assertIn("other_adapter_jlens_n100", source)
+        self.assertIn("public base-model J-Lens", source)
 
 
 if __name__ == "__main__":

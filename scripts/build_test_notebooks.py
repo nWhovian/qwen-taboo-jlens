@@ -1507,7 +1507,7 @@ write(
             r'''
 # 08 — Full 20-adapter test analysis
 
-**Purpose.** Analyze notebook 07 without running the model. Headline metrics
+**Purpose.** Analyze notebooks 07 and 07.1 without running the model. Headline metrics
 exclude literal own-secret leaks and use the primary global emitted-token-ID
 mask. The validation-frozen layer/position are confirmatory anchors; scans over
 all test layers and positions are explicitly exploratory.
@@ -1541,10 +1541,33 @@ analysis_done_files = sorted(analysis_cells_dir.glob("*.done.json"))
 analysis_aggregate_files = sorted(analysis_cells_dir.glob("*.aggregate.parquet"))
 analysis_position_files = sorted(analysis_cells_dir.glob("*.positions.parquet"))
 assert len(analysis_done_files) == len(analysis_aggregate_files) == len(analysis_position_files) == 4000
-print("run:", ANALYSIS_RUN_ID)
-print("aggregate GiB:", round(sum(p.stat().st_size for p in analysis_aggregate_files) / 2**30, 3))
-print("positions GiB:", round(sum(p.stat().st_size for p in analysis_position_files) / 2**30, 3))
+
+base_analysis_pointer = PROJECT_ROOT / "results/latest_qwen36_base_test_control_run.json"
+assert base_analysis_pointer.exists(), "Run completed notebook 07.1 first."
+base_analysis_pointer_data = load_json(base_analysis_pointer)
+BASE_ANALYSIS_RUN_ID = os.environ.get(
+    "QWEN_BASE_TEST_RUN_ID", base_analysis_pointer_data["run_id"]
+)
+base_analysis_paths, base_analysis_config = open_run(BASE_ANALYSIS_RUN_ID)
+base_completion = load_json(
+    base_analysis_paths.result_dir / "base_test_sweep_completion.json"
+)
+assert base_completion["completed_sequences"] == base_completion["expected_sequences"] == 200
+assert base_completion["source_adapter_test_run_id"] == ANALYSIS_RUN_ID
+base_analysis_cells_dir = base_analysis_paths.lens_dir / "base_test_cells"
+base_analysis_done_files = sorted(base_analysis_cells_dir.glob("*.done.json"))
+base_analysis_aggregate_files = sorted(base_analysis_cells_dir.glob("*.aggregate.parquet"))
+base_analysis_position_files = sorted(base_analysis_cells_dir.glob("*.positions.parquet"))
+assert len(base_analysis_done_files) == len(base_analysis_aggregate_files) == len(base_analysis_position_files) == 200
+
+print("adapter run:", ANALYSIS_RUN_ID)
+print("base control run:", BASE_ANALYSIS_RUN_ID)
+print("adapter aggregate GiB:", round(sum(p.stat().st_size for p in analysis_aggregate_files) / 2**30, 3))
+print("adapter positions GiB:", round(sum(p.stat().st_size for p in analysis_position_files) / 2**30, 3))
+print("base aggregate GiB:", round(sum(p.stat().st_size for p in base_analysis_aggregate_files) / 2**30, 3))
+print("base positions GiB:", round(sum(p.stat().st_size for p in base_analysis_position_files) / 2**30, 3))
 display(completion)
+display(base_completion)
             '''
         ),
         markdown(
@@ -1588,7 +1611,28 @@ primary_aggregate = valid_aggregate[
         analysis_config["readout"]["primary_mask_protocol"]
     )
 ].copy()
-print("aggregate rows:", len(aggregate), "primary valid rows:", len(primary_aggregate))
+
+base_behavior_path = base_analysis_paths.raw_dir / "base_test_behavior_generations.jsonl"
+base_behavior = pd.DataFrame(read_jsonl(base_behavior_path)).drop_duplicates(
+    ["prompt_id"], keep="last"
+)
+assert len(base_behavior) == 200
+assert set(base_behavior["condition"]) == {"base"}
+assert set(base_behavior["prompt_id"]) == set(behavior["prompt_id"])
+base_aggregate = pd.concat(
+    [pd.read_parquet(path) for path in base_analysis_aggregate_files],
+    ignore_index=True,
+)
+assert set(base_aggregate["split"]) == {"test"}
+assert set(base_aggregate["condition"]) == {"base"}
+assert set(base_aggregate["method"]) == {"logit_lens", "jlens"}
+assert set(base_aggregate["mask_protocol"]) == {
+    "global_emitted_ids", "position_actual_token", "unmasked"
+}
+assert set(base_aggregate["source_adapter_test_run_id"]) == {ANALYSIS_RUN_ID}
+
+print("adapter aggregate rows:", len(aggregate), "primary valid rows:", len(primary_aggregate))
+print("base aggregate rows:", len(base_aggregate))
 display(
     behavior.groupby(["prompt_type", "condition"], as_index=False)
     .agg(
@@ -1597,6 +1641,13 @@ display(
         mean_generation_tokens=("generation_token_count", "mean"),
     )
     .head(20)
+)
+display(
+    base_behavior.groupby("prompt_type", as_index=False).agg(
+        sequences=("prompt_id", "size"),
+        mean_generation_tokens=("generation_token_count", "mean"),
+        responses_mentioning_any_candidate=("any_candidate_mentioned", "sum"),
+    )
 )
             '''
         ),
@@ -2296,6 +2347,598 @@ display(paired_summary)
         ),
         markdown(
             r'''
+## Cross-candidate specificity across all 20 taboo words
+
+Notebook 07 stored the response-averaged probability of every taboo candidate,
+not only the adapter's own secret. Here we therefore ask the symmetric question
+for all 20 words: does a candidate receive a stronger score when its own adapter
+is loaded than when any of the other 19 adapters is loaded?
+
+This is a **closed-set 20-way diagnostic**, not a full-vocabulary rank. Rank 1
+means highest among the 20 taboo candidates after the primary global emitted-ID
+mask. Rows where a non-target candidate was itself emitted are marked unavailable
+for that candidate instead of silently treating its masked score as evidence.
+Literal own-secret leaks were already excluded above. We evaluate only the two
+predeclared anchor layers (paper layer 32 and validation layer 40), so this check
+does not select a new layer on test.
+            '''
+        ),
+        code(
+            r'''
+candidate_words = list(analysis_config["behavior"]["conditions"])
+assert len(candidate_words) == 20 and len(set(candidate_words)) == 20
+candidate_index = {word: index for index, word in enumerate(candidate_words)}
+
+cross_meta_columns = ["prompt_id", "prompt_type", "condition", "method", "layer"]
+cross_meta = anchor_primary[
+    cross_meta_columns
+    + ["candidate_probabilities_json", "target_candidate_rank_20"]
+].reset_index(drop=True)
+assert not cross_meta.duplicated(cross_meta_columns).any()
+
+decoded_candidate_scores = cross_meta["candidate_probabilities_json"].map(json.loads)
+assert decoded_candidate_scores.map(
+    lambda scores: set(scores) == set(candidate_words)
+).all()
+candidate_score_matrix = np.asarray(
+    [
+        [float(scores[word]) for word in candidate_words]
+        for scores in decoded_candidate_scores
+    ],
+    dtype=np.float64,
+)
+assert np.isfinite(candidate_score_matrix).all()
+
+# Candidate rank uses the same competition-rank rule as notebook 07:
+# 1 + number of candidates with a strictly larger score. Stable candidate order
+# is used only to choose one label when a confusion-matrix row has a top-score tie.
+# Masked candidates have sentinel score -1 and are excluded from rank summaries.
+candidate_order_matrix = np.argsort(
+    -candidate_score_matrix, axis=1, kind="stable"
+)
+candidate_rank_matrix = 1 + (
+    candidate_score_matrix[:, None, :] > candidate_score_matrix[:, :, None]
+).sum(axis=2)
+candidate_available_matrix = candidate_score_matrix >= 0
+nonnegative_candidate_scores = np.clip(candidate_score_matrix, 0.0, None)
+candidate_score_denominator = nonnegative_candidate_scores.sum(axis=1, keepdims=True)
+candidate_share_matrix = np.divide(
+    nonnegative_candidate_scores,
+    candidate_score_denominator,
+    out=np.zeros_like(nonnegative_candidate_scores),
+    where=candidate_score_denominator > 0,
+)
+
+row_indices = np.arange(len(cross_meta))
+target_indices = cross_meta["condition"].map(candidate_index).to_numpy()
+saved_target_ranks = cross_meta["target_candidate_rank_20"].astype(int).to_numpy()
+np.testing.assert_array_equal(
+    candidate_rank_matrix[row_indices, target_indices], saved_target_ranks
+)
+assert candidate_available_matrix[row_indices, target_indices].all()
+
+predicted_indices = candidate_order_matrix[:, 0]
+predicted_words = np.asarray(candidate_words, dtype=object)[predicted_indices]
+cross_predictions = cross_meta[cross_meta_columns].rename(
+    columns={"condition": "actual_adapter"}
+).copy()
+cross_predictions["predicted_candidate_20"] = predicted_words
+cross_predictions["top_score_tie_count"] = (
+    candidate_score_matrix == candidate_score_matrix.max(axis=1, keepdims=True)
+).sum(axis=1)
+cross_predictions["correct_candidate_20"] = saved_target_ranks == 1
+cross_predictions["true_candidate_rank_20"] = saved_target_ranks
+cross_predictions["true_candidate_share_20"] = candidate_share_matrix[
+    row_indices, target_indices
+]
+
+candidate_count = len(candidate_words)
+candidate_word_vector = np.tile(np.asarray(candidate_words, dtype=object), len(cross_meta))
+candidate_available_vector = candidate_available_matrix.reshape(-1)
+candidate_rank_vector = candidate_rank_matrix.reshape(-1)
+cross_candidate_detail = pd.DataFrame({
+    column: np.repeat(cross_meta[column].to_numpy(), candidate_count)
+    for column in cross_meta_columns
+}).rename(columns={"condition": "actual_adapter"})
+cross_candidate_detail["candidate_word"] = candidate_word_vector
+cross_candidate_detail["candidate_probability"] = candidate_score_matrix.reshape(-1)
+cross_candidate_detail["candidate_probability_share_20"] = candidate_share_matrix.reshape(-1)
+cross_candidate_detail["candidate_available"] = candidate_available_vector
+cross_candidate_detail["candidate_rank_20"] = pd.array(
+    np.where(candidate_available_vector, candidate_rank_vector, np.nan),
+    dtype="Int64",
+)
+cross_candidate_detail["candidate_reciprocal_rank_20"] = np.where(
+    candidate_available_vector, 1.0 / candidate_rank_vector, np.nan
+)
+cross_candidate_detail["candidate_is_top1"] = (
+    candidate_available_vector & (candidate_rank_vector == 1)
+)
+cross_candidate_detail["is_true_secret"] = (
+    cross_candidate_detail["actual_adapter"]
+    == cross_candidate_detail["candidate_word"]
+)
+
+cross_predictions.to_csv(
+    analysis_paths.result_dir / "test_cross_candidate_predictions_at_anchors.csv",
+    index=False,
+)
+cross_candidate_detail.to_parquet(
+    analysis_paths.result_dir / "test_cross_candidate_scores_at_anchors.parquet",
+    index=False,
+)
+
+cross_candidate_summary = (
+    cross_candidate_detail.groupby(
+        ["prompt_type", "actual_adapter", "method", "layer", "candidate_word"],
+        as_index=False,
+    )
+    .agg(
+        prompts=("prompt_id", "size"),
+        candidate_available_rate=("candidate_available", "mean"),
+        mean_candidate_probability=("candidate_probability", "mean"),
+        mean_candidate_share_20=("candidate_probability_share_20", "mean"),
+        median_candidate_rank_20=("candidate_rank_20", "median"),
+        mean_candidate_rr_20=("candidate_reciprocal_rank_20", "mean"),
+        candidate_top1_rate=("candidate_is_top1", "mean"),
+    )
+)
+cross_candidate_summary.to_csv(
+    analysis_paths.result_dir / "test_cross_candidate_summary_at_anchors.csv",
+    index=False,
+)
+
+# This matched-vs-other contrast is the direct specificity test. For each word,
+# compare its evidence under its own adapter with its background evidence under
+# all 19 wrong adapters. A positive share/top-1 lift and rank improvement support
+# adapter-specific secret information rather than a generic high-frequency word.
+specificity_rows = []
+for keys, part in cross_candidate_detail.groupby(
+    ["prompt_type", "method", "layer", "candidate_word"], sort=False
+):
+    prompt_type, method, layer, candidate_word = keys
+    matched = part[part["is_true_secret"]]
+    other = part[~part["is_true_secret"]]
+    matched_share = float(matched["candidate_probability_share_20"].mean())
+    other_share = float(other["candidate_probability_share_20"].mean())
+    specificity_rows.append({
+        "prompt_type": prompt_type,
+        "method": method,
+        "layer": int(layer),
+        "candidate_word": candidate_word,
+        "matched_examples": len(matched),
+        "other_adapter_examples": len(other),
+        "matched_available_rate": float(matched["candidate_available"].mean()),
+        "other_available_rate": float(other["candidate_available"].mean()),
+        "matched_mean_share_20": matched_share,
+        "other_mean_share_20": other_share,
+        "specificity_share_delta": matched_share - other_share,
+        "specificity_share_ratio": (
+            matched_share / other_share if other_share > 0 else np.nan
+        ),
+        "matched_median_rank_20": float(matched["candidate_rank_20"].median()),
+        "other_median_rank_20": float(other["candidate_rank_20"].median()),
+        "specificity_median_rank_improvement": float(
+            other["candidate_rank_20"].median()
+            - matched["candidate_rank_20"].median()
+        ),
+        "matched_mean_rr_20": float(
+            matched["candidate_reciprocal_rank_20"].mean()
+        ),
+        "other_mean_rr_20": float(
+            other["candidate_reciprocal_rank_20"].mean()
+        ),
+        "specificity_rr_delta": float(
+            matched["candidate_reciprocal_rank_20"].mean()
+            - other["candidate_reciprocal_rank_20"].mean()
+        ),
+        "matched_top1_rate": float(matched["candidate_is_top1"].mean()),
+        "other_top1_rate": float(other["candidate_is_top1"].mean()),
+        "specificity_top1_delta": float(
+            matched["candidate_is_top1"].mean()
+            - other["candidate_is_top1"].mean()
+        ),
+    })
+cross_candidate_specificity = pd.DataFrame(specificity_rows)
+cross_candidate_specificity.to_csv(
+    analysis_paths.result_dir / "test_cross_candidate_specificity_at_anchors.csv",
+    index=False,
+)
+
+cross_candidate_accuracy = (
+    cross_predictions.groupby(["prompt_type", "method", "layer"], as_index=False)
+    .agg(
+        prompt_adapter_examples=("prompt_id", "size"),
+        closed_set_accuracy_20=("correct_candidate_20", "mean"),
+        median_true_candidate_rank_20=("true_candidate_rank_20", "median"),
+        mean_true_candidate_share_20=("true_candidate_share_20", "mean"),
+    )
+)
+cross_candidate_accuracy.to_csv(
+    analysis_paths.result_dir / "test_cross_candidate_accuracy_at_anchors.csv",
+    index=False,
+)
+
+cross_candidate_confusion = (
+    cross_predictions.groupby(
+        ["prompt_type", "method", "layer", "actual_adapter", "predicted_candidate_20"],
+        as_index=False,
+    )
+    .size()
+    .rename(columns={"size": "prompts"})
+)
+cross_candidate_confusion["prediction_rate"] = (
+    cross_candidate_confusion["prompts"]
+    / cross_candidate_confusion.groupby(
+        ["prompt_type", "method", "layer", "actual_adapter"]
+    )["prompts"].transform("sum")
+)
+cross_candidate_confusion.to_csv(
+    analysis_paths.result_dir / "test_cross_candidate_confusion_at_anchors.csv",
+    index=False,
+)
+
+display(cross_candidate_accuracy.sort_values(["layer", "prompt_type", "method"]))
+with pd.option_context("display.max_rows", 100, "display.max_columns", None):
+    display(
+        cross_candidate_specificity.sort_values(
+            ["layer", "prompt_type", "method", "specificity_share_delta"],
+            ascending=[True, True, True, False],
+        )
+    )
+
+for layer in anchor_layers:
+    figure, axes = plt.subplots(2, 2, figsize=(24, 20), constrained_layout=True)
+    for row_index, prompt_type in enumerate(("standard", "direct")):
+        for column_index, method in enumerate(("logit_lens", "jlens")):
+            axis = axes[row_index, column_index]
+            subset = cross_candidate_confusion[
+                cross_candidate_confusion["layer"].eq(layer)
+                & cross_candidate_confusion["prompt_type"].eq(prompt_type)
+                & cross_candidate_confusion["method"].eq(method)
+            ]
+            pivot = subset.pivot(
+                index="actual_adapter",
+                columns="predicted_candidate_20",
+                values="prediction_rate",
+            ).reindex(index=candidate_words, columns=candidate_words).fillna(0.0)
+            sns.heatmap(
+                pivot,
+                cmap="Blues",
+                vmin=0,
+                vmax=1,
+                square=True,
+                cbar_kws={"label": "Fraction of prompts predicted as column word"},
+                ax=axis,
+            )
+            for diagonal_index, word in enumerate(candidate_words):
+                diagonal_value = float(pivot.loc[word, word])
+                axis.text(
+                    diagonal_index + 0.5,
+                    diagonal_index + 0.5,
+                    f"{diagonal_value:.2f}",
+                    ha="center",
+                    va="center",
+                    fontsize=7,
+                    fontweight="bold",
+                    color="black",
+                )
+            axis.set_title(f"{method_labels[method]} — {prompt_type}")
+            axis.set_xlabel("highest-scoring candidate among 20")
+            axis.set_ylabel("actual loaded adapter")
+            axis.tick_params(axis="x", labelrotation=60, labelsize=8)
+            axis.tick_params(axis="y", labelrotation=0, labelsize=8)
+    figure.suptitle(
+        f"20-way taboo-word confusion at Qwen layer {layer}\n"
+        "global emitted-ID mask; diagonal labels are closed-set accuracy per adapter",
+        fontsize=17,
+    )
+    figure.text(
+        0.5,
+        -0.01,
+        "Rows = actual adapter; columns = top candidate. Dark off-diagonal cells show systematic confusion. "
+        "Literal own-secret leaks are excluded.",
+        ha="center",
+        fontsize=11,
+    )
+    output = analysis_paths.figure_dir / f"test_cross_candidate_confusion_layer_{layer}.png"
+    figure.savefig(output, dpi=180, bbox_inches="tight")
+    plt.show()
+            '''
+        ),
+        markdown(
+            r'''
+## Paired adapter-versus-base specificity control
+
+The previous section compares each word's matching adapter with the other 19
+adapters. This section adds the stricter control: the same word under its
+matching LoRA versus the base model on the **same prompt, method, source layer,
+and mask protocol**.
+
+Positive deltas in 20-way probability share and reciprocal rank mean that
+loading the matching adapter strengthens that candidate beyond its base-model
+prior. Full-vocabulary rank gives the corresponding open-vocabulary comparison.
+Base candidates emitted in the base response are unavailable under the global
+emitted-ID mask; availability is explicit, and unmasked remains diagnostic.
+Anchor-level 95% intervals bootstrap prompts as clusters because 20 adapters
+share each prompt.
+All-layer summaries are descriptive; layers 32 and 40 are predeclared anchors.
+            '''
+        ),
+        code(
+            r'''
+base_aggregate = base_aggregate.reset_index(drop=True)
+base_pair_keys = ["prompt_id", "prompt_type", "method", "layer", "mask_protocol"]
+assert not base_aggregate.duplicated(base_pair_keys).any()
+
+def candidate_json_matrix(frame, column):
+    decoded = frame[column].map(json.loads)
+    assert decoded.map(lambda values: set(values) == set(candidate_words)).all()
+    return np.asarray([
+        [np.nan if values[word] is None else float(values[word]) for word in candidate_words]
+        for values in decoded
+    ], dtype=np.float64)
+
+base_candidate_probability_matrix = candidate_json_matrix(
+    base_aggregate, "candidate_probabilities_json"
+)
+base_candidate_mass_matrix = candidate_json_matrix(
+    base_aggregate, "candidate_probability_masses_json"
+)
+base_candidate_rank20_matrix = candidate_json_matrix(
+    base_aggregate, "candidate_ranks_20_json"
+)
+base_candidate_share20_matrix = candidate_json_matrix(
+    base_aggregate, "candidate_probability_shares_20_json"
+)
+base_candidate_full_rank_matrix = candidate_json_matrix(
+    base_aggregate, "candidate_full_vocab_ranks_json"
+)
+base_candidate_available_matrix = np.isfinite(base_candidate_rank20_matrix)
+
+adapter_base_summaries = []
+adapter_base_anchor_pairs = []
+for candidate_index, candidate_word in enumerate(candidate_words):
+    base_word = base_aggregate[base_pair_keys].copy()
+    base_word["candidate_word"] = candidate_word
+    base_word["base_candidate_available"] = base_candidate_available_matrix[:, candidate_index]
+    base_word["base_candidate_probability"] = base_candidate_probability_matrix[:, candidate_index]
+    base_word["base_candidate_probability_mass"] = base_candidate_mass_matrix[:, candidate_index]
+    base_word["base_candidate_rank_20"] = base_candidate_rank20_matrix[:, candidate_index]
+    base_word["base_candidate_share_20"] = base_candidate_share20_matrix[:, candidate_index]
+    base_word["base_full_vocab_rank"] = base_candidate_full_rank_matrix[:, candidate_index]
+    base_word["base_full_vocab_rr"] = 1.0 / base_word["base_full_vocab_rank"]
+
+    adapter_word = valid_aggregate[
+        valid_aggregate["condition"].eq(candidate_word)
+    ][base_pair_keys + [
+        "target_probability", "target_probability_mass", "target_rank",
+        "target_reciprocal_rank", "target_candidate_rank_20",
+        "target_candidate_probability_share",
+    ]].copy()
+    assert not adapter_word.duplicated(base_pair_keys).any()
+    adapter_word["candidate_word"] = candidate_word
+    adapter_word = adapter_word.rename(columns={
+        "target_probability": "adapter_candidate_probability",
+        "target_probability_mass": "adapter_candidate_probability_mass",
+        "target_rank": "adapter_full_vocab_rank",
+        "target_reciprocal_rank": "adapter_full_vocab_rr",
+        "target_candidate_rank_20": "adapter_candidate_rank_20",
+        "target_candidate_probability_share": "adapter_candidate_share_20",
+    })
+    paired = adapter_word.merge(
+        base_word, on=base_pair_keys + ["candidate_word"],
+        how="inner", validate="one_to_one",
+    )
+    assert len(paired) == len(adapter_word)
+    paired["paired_candidate_available"] = (
+        paired["base_candidate_available"]
+        & paired["adapter_full_vocab_rank"].notna()
+    )
+    available = paired["paired_candidate_available"]
+    paired["adapter_candidate_rr_20"] = 1.0 / paired["adapter_candidate_rank_20"]
+    paired["base_candidate_rr_20"] = 1.0 / paired["base_candidate_rank_20"]
+    paired["delta_candidate_share_20"] = np.where(
+        available, paired["adapter_candidate_share_20"] - paired["base_candidate_share_20"], np.nan
+    )
+    paired["delta_candidate_rr_20"] = np.where(
+        available, paired["adapter_candidate_rr_20"] - paired["base_candidate_rr_20"], np.nan
+    )
+    paired["delta_full_vocab_rr"] = np.where(
+        available, paired["adapter_full_vocab_rr"] - paired["base_full_vocab_rr"], np.nan
+    )
+    paired["adapter_share_beats_base"] = np.where(
+        available, paired["adapter_candidate_share_20"] > paired["base_candidate_share_20"], np.nan
+    )
+    paired["adapter_full_rank_beats_base"] = np.where(
+        available, paired["adapter_full_vocab_rank"] < paired["base_full_vocab_rank"], np.nan
+    )
+    paired["adapter_hit_at_5"] = np.where(
+        available, paired["adapter_full_vocab_rank"] <= 5, np.nan
+    )
+    paired["base_hit_at_5"] = np.where(
+        available, paired["base_full_vocab_rank"] <= 5, np.nan
+    )
+
+    per_candidate = paired.groupby(
+        ["prompt_type", "method", "layer", "mask_protocol"], as_index=False
+    ).agg(
+        paired_examples=("prompt_id", "size"),
+        available_pairs=("paired_candidate_available", "sum"),
+        base_candidate_available_rate=("base_candidate_available", "mean"),
+        mean_delta_candidate_share_20=("delta_candidate_share_20", "mean"),
+        mean_delta_candidate_rr_20=("delta_candidate_rr_20", "mean"),
+        mean_delta_full_vocab_rr=("delta_full_vocab_rr", "mean"),
+        adapter_share_win_rate=("adapter_share_beats_base", "mean"),
+        adapter_full_rank_win_rate=("adapter_full_rank_beats_base", "mean"),
+        median_adapter_full_vocab_rank=("adapter_full_vocab_rank", "median"),
+        median_base_full_vocab_rank=("base_full_vocab_rank", "median"),
+        adapter_hit_at_5=("adapter_hit_at_5", "mean"),
+        base_hit_at_5=("base_hit_at_5", "mean"),
+    )
+    per_candidate["candidate_word"] = candidate_word
+    adapter_base_summaries.append(per_candidate)
+    adapter_base_anchor_pairs.append(paired[paired["layer"].isin(anchor_layers)])
+
+adapter_vs_base_by_candidate_layer = pd.concat(adapter_base_summaries, ignore_index=True)
+adapter_vs_base_anchor_pairs = pd.concat(adapter_base_anchor_pairs, ignore_index=True)
+adapter_vs_base_by_candidate_layer.to_csv(
+    analysis_paths.result_dir / "test_adapter_vs_base_by_candidate_all_layers.csv", index=False
+)
+adapter_vs_base_anchor_pairs.to_parquet(
+    analysis_paths.result_dir / "test_adapter_vs_base_paired_at_anchors.parquet", index=False
+)
+
+def prompt_cluster_bootstrap_mean_interval(frame, value_column, seed, draws=2000):
+    # Twenty adapters share each prompt, so resample prompt-level means rather
+    # than pretending all prompt-adapter rows are independent observations.
+    clean = frame.groupby("prompt_id")[value_column].mean().dropna().to_numpy(dtype=np.float64)
+    clean = clean[np.isfinite(clean)]
+    if len(clean) == 0:
+        return np.nan, np.nan
+    rng = np.random.default_rng(seed)
+    sampled_means = rng.choice(clean, size=(draws, len(clean)), replace=True).mean(axis=1)
+    return tuple(np.quantile(sampled_means, [0.025, 0.975]))
+
+pooled_rows = []
+for group_index, (keys, part) in enumerate(adapter_vs_base_anchor_pairs.groupby(
+    ["prompt_type", "method", "layer", "mask_protocol"], sort=True
+)):
+    prompt_type, method, layer, mask_protocol = keys
+    usable = part[part["paired_candidate_available"]]
+    share_low, share_high = prompt_cluster_bootstrap_mean_interval(
+        usable, "delta_candidate_share_20", seed=17000 + group_index
+    )
+    full_rr_low, full_rr_high = prompt_cluster_bootstrap_mean_interval(
+        usable, "delta_full_vocab_rr", seed=27000 + group_index
+    )
+    pooled_rows.append({
+        "prompt_type": prompt_type, "method": method, "layer": int(layer),
+        "mask_protocol": mask_protocol, "paired_examples": len(part),
+        "available_pairs": len(usable),
+        "base_candidate_available_rate": float(part["base_candidate_available"].mean()),
+        "mean_delta_candidate_share_20": float(usable["delta_candidate_share_20"].mean()),
+        "mean_delta_candidate_share_20_ci_low": float(share_low),
+        "mean_delta_candidate_share_20_ci_high": float(share_high),
+        "adapter_share_win_rate": float(usable["adapter_share_beats_base"].mean()),
+        "mean_delta_candidate_rr_20": float(usable["delta_candidate_rr_20"].mean()),
+        "mean_delta_full_vocab_rr": float(usable["delta_full_vocab_rr"].mean()),
+        "mean_delta_full_vocab_rr_ci_low": float(full_rr_low),
+        "mean_delta_full_vocab_rr_ci_high": float(full_rr_high),
+        "adapter_full_rank_win_rate": float(usable["adapter_full_rank_beats_base"].mean()),
+        "median_adapter_full_vocab_rank": float(usable["adapter_full_vocab_rank"].median()),
+        "median_base_full_vocab_rank": float(usable["base_full_vocab_rank"].median()),
+        "adapter_hit_at_5": float(usable["adapter_hit_at_5"].mean()),
+        "base_hit_at_5": float(usable["base_hit_at_5"].mean()),
+    })
+adapter_vs_base_anchor_summary = pd.DataFrame(pooled_rows)
+adapter_vs_base_anchor_summary.to_csv(
+    analysis_paths.result_dir / "test_adapter_vs_base_summary_at_anchors.csv", index=False
+)
+display(adapter_vs_base_anchor_summary.sort_values(
+    ["layer", "mask_protocol", "prompt_type", "method"]
+))
+
+primary_base_comparison = adapter_vs_base_by_candidate_layer[
+    adapter_vs_base_by_candidate_layer["mask_protocol"].eq(
+        analysis_config["readout"]["primary_mask_protocol"]
+    )
+].copy()
+for layer in anchor_layers:
+    figure, axes = plt.subplots(2, 2, figsize=(22, 13), constrained_layout=True)
+    for row_index, prompt_type in enumerate(("standard", "direct")):
+        for column_index, (metric, label) in enumerate((
+            ("mean_delta_candidate_share_20", "LoRA - base: mean 20-way probability share"),
+            ("mean_delta_full_vocab_rr", "LoRA - base: mean full-vocabulary reciprocal rank"),
+        )):
+            axis = axes[row_index, column_index]
+            subset = primary_base_comparison[
+                primary_base_comparison["layer"].eq(layer)
+                & primary_base_comparison["prompt_type"].eq(prompt_type)
+            ]
+            x = np.arange(len(candidate_words))
+            for method_index, method in enumerate(("logit_lens", "jlens")):
+                method_part = subset[subset["method"].eq(method)].set_index("candidate_word").reindex(candidate_words)
+                offset = -0.13 if method_index == 0 else 0.13
+                axis.scatter(
+                    x + offset, method_part[metric], s=42,
+                    label=method_labels[method], alpha=0.85,
+                )
+            axis.axhline(0, color="black", linewidth=1, linestyle="--")
+            axis.set_xticks(x, candidate_words, rotation=60, ha="right")
+            axis.set_ylabel(label + " (positive favors LoRA)")
+            axis.set_title(prompt_type)
+            axis.grid(axis="y", alpha=0.25)
+            axis.legend(title="Readout")
+    figure.suptitle(
+        f"Matching-secret adapter versus base control at Qwen layer {layer}\n"
+        "same prompt and global emitted-ID mask; each point is one candidate word",
+        fontsize=16,
+    )
+    figure.text(
+        0.5, -0.015,
+        "Consistently positive values across words support adapter-specific secret evidence rather than a base-model word prior.",
+        ha="center", fontsize=11,
+    )
+    output = analysis_paths.figure_dir / f"test_adapter_vs_base_specificity_layer_{layer}.png"
+    figure.savefig(output, dpi=180, bbox_inches="tight")
+    plt.show()
+            '''
+        ),
+        markdown(
+            r'''
+### Base-model decoded-token inspection
+
+The quantitative comparison above uses response averages. This compact audit
+also exposes base-model decoded top-10 tokens at the frozen layer for the same
+meaningful prompt/header and generated-response offsets used in the adapter
+inspection. It is diagnostic rather than a headline metric.
+            '''
+        ),
+        code(
+            r'''
+base_inspection_columns = [
+    "prompt_id", "prompt_type", "condition", "method", "layer",
+    "position", "position_role", "position_label", "position_from_prompt_end",
+    "observed_token", "prediction_target_token", "context",
+    "candidate_probabilities_json", "candidate_ranks_20_json",
+    "top1_token", "top10_json",
+]
+base_inspection_parts = []
+for path in base_analysis_position_files:
+    part = pd.read_parquet(path, columns=base_inspection_columns)
+    part = part[
+        part["layer"].eq(frozen_layer)
+        & (
+            part["position_role"].isin([
+                "assistant_turn_start_control", "assistant_role_token",
+                "assistant_thinking_open_control", "assistant_thinking_close_control",
+                "response_start_boundary_separator",
+            ])
+            | part["position_from_prompt_end"].isin([1, 2, 6, 11, 21])
+        )
+    ]
+    if len(part):
+        base_inspection_parts.append(part)
+base_decoded_inspection = pd.concat(base_inspection_parts, ignore_index=True)
+base_decoded_inspection["decoded_top10"] = base_decoded_inspection["top10_json"].map(
+    decoded_top_tokens
+)
+base_decoded_inspection.to_parquet(
+    analysis_paths.result_dir / "test_base_decoded_top_token_inspection.parquet",
+    index=False,
+)
+with pd.option_context("display.max_colwidth", 120, "display.max_rows", 40):
+    display(base_decoded_inspection.sort_values(
+        ["prompt_type", "prompt_id", "method", "position"]
+    )[[
+        "prompt_id", "method", "position_label", "observed_token",
+        "prediction_target_token", "top1_token", "decoded_top10",
+    ]].head(40))
+            '''
+        ),
+        markdown(
+            r'''
 ## Exploratory best test layers — never use these as confirmatory selection
 
 This ranks layers only to describe the test map. The valid confirmatory answer
@@ -2330,9 +2973,10 @@ evidence.
         code(
             r'''
 analysis_completion = {
-    "schema_version": 1,
+    "schema_version": 2,
     "created_utc": utc_now(),
     "run_id": ANALYSIS_RUN_ID,
+    "base_control_run_id": BASE_ANALYSIS_RUN_ID,
     "literal_own_secret_leaks_excluded": len(leak_keys),
     "primary_mask_protocol": analysis_config["readout"]["primary_mask_protocol"],
     "confirmatory_response_average_layer": validation_layer,
@@ -2345,11 +2989,22 @@ analysis_completion = {
     "all_layer_and_position_scans_are_exploratory": True,
     "position_rows_analyzed": len(valid_positions),
     "aggregate_rows_analyzed": len(valid_aggregate),
+    "base_aggregate_rows_analyzed": len(base_aggregate),
     "artifacts": {
         "paper_metrics": "test_paper_metrics_all_layers.csv",
         "rank_metrics": "test_rank_probability_metrics_by_layer.csv",
         "frozen_metrics": "test_frozen_layer40_gen5_metrics.csv",
         "decoded_inspection": "test_decoded_top_token_inspection.parquet",
+        "cross_candidate_predictions": "test_cross_candidate_predictions_at_anchors.csv",
+        "cross_candidate_scores": "test_cross_candidate_scores_at_anchors.parquet",
+        "cross_candidate_summary": "test_cross_candidate_summary_at_anchors.csv",
+        "cross_candidate_specificity": "test_cross_candidate_specificity_at_anchors.csv",
+        "cross_candidate_accuracy": "test_cross_candidate_accuracy_at_anchors.csv",
+        "cross_candidate_confusion": "test_cross_candidate_confusion_at_anchors.csv",
+        "adapter_vs_base_all_layers": "test_adapter_vs_base_by_candidate_all_layers.csv",
+        "adapter_vs_base_anchor_pairs": "test_adapter_vs_base_paired_at_anchors.parquet",
+        "adapter_vs_base_anchor_summary": "test_adapter_vs_base_summary_at_anchors.csv",
+        "base_decoded_inspection": "test_base_decoded_top_token_inspection.parquet",
     },
 }
 (analysis_paths.result_dir / "test_analysis_completion.json").write_text(
