@@ -6,10 +6,11 @@ We tested a public J-Lens on 20 versions of Qwen3.6-27B. Each version had a
 small LoRA trained around one secret word, such as `moon`, `rock`, or `smile`.
 The model had to give hints about the word without saying it.
 
-The main result is simple: the J-Lens was trained on base Qwen, but it still
-recovered the secret after the LoRA was attached. At our fixed layer and answer
-position, the secret word family was in its top 5 for **74.0%** of leak-free
-answers. Logit Lens reached **52.3%**. A sparse J-Space readout reached **68.0%**.
+The main result is simple: the J-Lens was fitted from activations of base Qwen,
+but it still recovered the secret after the LoRA was attached. At our fixed
+layer and answer position, the secret word family was in its top 5 for **74.0%**
+of leak-free answers. Logit Lens reached **52.3%**. A sparse J-Space readout
+reached **68.0%**.
 
 So the base-model J-Lens transfers to this family of narrow LoRAs. It is useful,
 but it is not better for every secret, layer, or answer position.
@@ -32,7 +33,8 @@ We used `Qwen/Qwen3.6-27B`, 20 public Taboo LoRAs, and 100 standard TEST prompts
 per LoRA. We compared three readouts:
 
 - **Logit Lens** reads an activation directly as token scores.
-- **J-Lens** first transforms the activation with a map learned on base Qwen.
+- **J-Lens** first transforms the activation with a map fitted from base-Qwen
+  activations.
 - **J-Space** describes the activation with 16 sparse J-Lens token directions.
 
 Layer 40 and generated-token index 5 were chosen on a separate validation set,
@@ -175,10 +177,11 @@ repeat the study on Taboo models trained to resist prompt attacks.
 
 ## Conclusion
 
-A public J-Lens fitted on base Qwen remains informative after 20 narrow Taboo
-LoRAs. It recovers the target more often than Logit Lens at the fixed readout
-point, and the signal is specific to the loaded LoRA. J-Space also recovers a
-strong signal, but it is not a general improvement over ordinary J-Lens.
+A public J-Lens fitted from base-Qwen activations remains informative after 20
+narrow Taboo LoRAs. It recovers the target more often than Logit Lens at the
+fixed readout point, and the signal is specific to the loaded LoRA. J-Space also
+recovers a strong signal, but it is not a general improvement over ordinary
+J-Lens.
 
 The safest claim is:
 
