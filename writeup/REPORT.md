@@ -1,221 +1,211 @@
-# Can a Base-Model J-Lens Decode a Taboo Word After LoRA Fine-Tuning?
+# A Base-Model J-Lens Still Works After Taboo LoRA Fine-Tuning
 
 ## Short answer
 
-Yes, in this experiment it can.
-
 We tested a public J-Lens on 20 versions of Qwen3.6-27B. Each version had a
-small LoRA adapter. Each adapter was trained around one secret word, such as
-`moon`, `rock`, or `smile`. The model had to give hints about the word without
-saying it.
+small LoRA trained around one secret word, such as `moon`, `rock`, or `smile`.
+The model had to give hints about the word without saying it.
 
-At the fifth generated token, the public J-Lens put the correct word family in
-its top 5 in **74.0%** of leak-free answers. Logit Lens reached **52.3%**. A
-sparse J-Space readout reached **68.0%**.
+The main result is simple: the J-Lens was trained on base Qwen, but it still
+recovered the secret after the LoRA was attached. At our fixed layer and answer
+position, the secret word family was in its top 5 for **74.0%** of leak-free
+answers. Logit Lens reached **52.3%**. A sparse J-Space readout reached **68.0%**.
 
-The public J-Lens was trained on the base model, before any of these LoRAs were
-added. So the main result is simple:
+So the base-model J-Lens transfers to this family of narrow LoRAs. It is useful,
+but it is not better for every secret, layer, or answer position.
 
-> A J-Lens trained on the base model can still read a strong and specific
-> signal after narrow LoRA fine-tuning.
+## Why this question matters
 
-## Why we did this
+Interpretability tools are usually built for one exact model. Real models are
+fine-tuned many times. Training a new tool for every fine-tuned checkpoint can
+be expensive.
 
-Interpretability tools are often trained for one exact model. But real models
-are fine-tuned many times. It would be useful if one tool could still work on a
-related fine-tuned model.
+This project asks whether one white-box tool can be reused after a small
+fine-tune. It is not a competition to find the best possible way to guess a
+Taboo word. Black-box prompting can work very well on this task. We use the
+simple Taboo setting because it gives us a known piece of target information
+and lets us test the readout carefully.
 
-This project tests that question in a small and controlled setting. It is not a
-competition to find the best way to guess a Taboo word. Black-box prompting can
-work very well here. We wanted to know whether a reusable **white-box** tool can
-still read the internal signal after LoRA fine-tuning. Here, white-box means
-that the method can see the model's internal activations.
+## Setup
 
-## What we tested
+We used `Qwen/Qwen3.6-27B`, 20 public Taboo LoRAs, and 100 standard TEST prompts
+per LoRA. We compared three readouts:
 
-We used `Qwen/Qwen3.6-27B`, 20 public Taboo LoRAs, and 100 standard test prompts
-per adapter. We compared a public J-Lens trained on base Qwen, Logit Lens, and
-public J-Space with 16 sparse components.
+- **Logit Lens** reads an activation directly as token scores.
+- **J-Lens** first transforms the activation with a map learned on base Qwen.
+- **J-Space** describes the activation with 16 sparse J-Lens token directions.
 
-Logit Lens reads an activation directly as token scores. J-Lens first adjusts
-it with a map learned from the model. J-Space tries to describe it with a small
-set of J-Lens token directions.
+Layer 40 and generated-token index 5 were chosen on a separate validation set,
+before the full 20-LoRA TEST result was inspected.
 
-We chose layer 40 and the fifth generated token on a separate validation set.
-We did this before looking at the full 20-adapter test result.
+The model produced 2,000 TEST answers. We removed 17 answers that contained the
+secret or a simple plural form. This left 1,983 answers for the final comparison.
+We also masked every token ID that the model emitted, so a readout could not get
+credit by directly copying a generated token.
 
-The full test had 2,000 answers. We removed 17 that contained the secret or its
-simple plural form. This left **1,983 answers per method**.
+## What is the baseline?
 
-We also masked token IDs that appeared in the model's answer. This stops a
-method from getting credit for directly copying an emitted token. It does not
-remove the meaning of the words already written in the answer.
+We have two good baselines, but they answer different questions.
 
-A hit counts either the singular or a simple plural form: for example, `rock`
-or `rocks`. We added this rule after the Rock pilot showed that morphology
-matters, then fixed it for all 20 adapters. This is still a follow-up, not a
-completely untouched confirmation.
+- **Logit Lens is the method baseline.** It asks whether J-Lens improves on the
+  simplest activation-to-token readout.
+- **Base Qwen without a LoRA is the model baseline.** It asks whether the secret
+  was already easy to recover from the same prompt before fine-tuning.
+- **Random chance is 5%** when a method must choose one secret from the set of 20.
 
-## Main result
+We do **not** yet have a text-only baseline. That missing control would ask how
+well a reader or language model can guess the secret from only the answer text
+available at the measured position. Because of this, we do not claim that the
+activation readout finds information that is absent from the visible hints.
 
-The table shows how often the correct word family appeared among the decoded
-words at layer 40 and generated token 5.
+![Method and model baselines.](figures/report_overview_bars.png)
 
-| Method | Top 1 | Top 5 | Top 10 |
-|---|---:|---:|---:|
-| Logit Lens | 34.3% | 52.3% | 60.0% |
-| Public J-Lens | **55.7%** | **74.0%** | **78.2%** |
-| Public J-Space | 53.9% | 68.0% | 70.6% |
+**Figure 1. Two baselines for two questions.** Panel A compares the three
+readouts at the fixed layer and answer position. A hit includes the singular or
+a simple plural form. Panel B compares the same prompts with and without the
+matching LoRA, using the exact secret and a response-average readout. Error bars
+show uncertainty across the 20 LoRAs, so they are wider than prompt-level error
+bars.
 
-![Morphology-aware recovery for all 20 adapters.](../reports/all_adapter_jspace_gen5/run_20260904T162622Z_qwen36_all_adapter_public_jspace_l40_gen5_full/morphology_hit_rates.png)
+The important pattern is visible without reading every number. J-Lens and
+J-Space both beat the simple Logit Lens baseline. The same secrets are not
+recovered from base Qwen, so the strong signal appears with the matching LoRA.
 
-**Figure 1.** Results on 1,983 leak-free standard test answers. Higher is
-better. Public J-Lens is best overall. J-Space is clearly better than Logit
-Lens, but worse than ordinary J-Lens on the pooled result.
+## Where in the model is the secret readable?
 
-The paired differences are large. Public J-Lens improves over Logit Lens by
-**21.4 percentage points** at Top 1 and **21.7 points** at Top 5. J-Space
-improves over Logit Lens by **19.6 points** at Top 1 and **15.7 points** at Top
-5. The bootstrap intervals for these differences do not cross zero.
+The result is not spread evenly across the network. Recovery is almost zero in
+early layers, rises in the middle of the model, peaks around layer 40, and then
+falls again. J-Lens is usually stronger in the later part of this window.
 
-The result is not equally strong for every secret. Public J-Lens beats Logit
-Lens at Top 1 for 15 of 20 adapters, ties for one, and loses for four. This is
-why we should not say that J-Lens always wins.
+![Secret Hit@5 across layers.](figures/report_layer_curve_hit5.png)
 
-## Is the signal really connected to the adapter?
+**Figure 2. Exact-secret Top-5 recovery across layers.** Each line uses a
+response-average readout on the standard TEST answers. The shaded area is a 95%
+bootstrap interval across the 20 LoRAs. The dashed line marks layer 40, which was
+chosen on validation rather than selected from this TEST curve.
 
-We checked two simple explanations.
+Looking across both layer and answer position gives a more complete picture.
 
-The first explanation was that the base model already gives high scores to
-common words such as `rock` or `gold`. We ran the same prompts through base Qwen
-without a LoRA. In the response-average analysis, both J-Lens and Logit Lens had
-**0% Top-5 recovery** on the base model. With the matching LoRA, the numbers
-were 79.6% for J-Lens and 69.9% for Logit Lens. This earlier control used the
-literal leak filter and 1,985 answers. The later plural-aware filter removed two
-more answers; it did not change the main conclusion.
+![J-Lens minus Logit Lens across layers and answer positions.](figures/report_layer_position_heatmap.png)
 
-The second explanation was that every Taboo adapter creates the same generic
-“there is a secret” state. We compared the correct word with the other 19
-secret words. The correct word ranked first in **96.0%** of J-Lens readouts and
-**94.7%** of Logit Lens readouts.
+**Figure 3. J-Lens advantage across layers and answer positions.** Blue means
+J-Lens has higher exact-secret Top-5 recovery; red means Logit Lens is higher.
+The yellow box is our fixed layer-40, `gen_5` result. This full TEST heatmap is
+exploratory. It shows that “J-Lens is better” is not a universal statement: the
+answer depends on where we read the activation.
 
-These checks show that the signal is connected to the identity of the loaded
-adapter, not only to the prompt format or to a general Taboo state.
+## Is this only a generic “there is a secret” signal?
 
-![Matched base and wrong-secret controls.](figures/writeup_specificity_controls.png)
+A method could score well by detecting the Taboo task without knowing which
+secret the model has. We tested this by making each readout choose between all
+20 secret words.
 
-**Figure 2.** Left: recovery with the matching LoRA compared with base Qwen.
-Right: choosing the correct word among all 20 secrets.
+![Twenty-way confusion matrices.](figures/report_confusion_matrices.png)
 
-## Did sparse J-Space make the result better?
+**Figure 4. Which LoRA is loaded?** Rows are the actual Taboo LoRA and columns
+are the predicted secret. Both matrices are strongly diagonal. J-Lens chooses
+the correct secret in 96.0% of answers and Logit Lens in 94.7%; random accuracy
+is 5%.
 
-Not overall.
+This is strong evidence that the activation signal is specific to the loaded
+LoRA. It is not only a general censorship or prompt-format signal. It does not,
+however, prove that the model causally uses the decoded direction.
 
-The first Rock-only pilot looked like a failure because exact-token scoring
-found `rock` in only 2 of 99 sparse supports. Raw inspection showed the real
-problem: `rocks` was the largest component in 87 of 99 answers. This is why we
-moved to the same singular/plural rule for all adapters.
+## What we learned from J-Space
 
-On all 20 adapters, J-Space is much better than Logit Lens, but ordinary J-Lens
-is still better on average. J-Space is 1.9 points lower at Top 1 and 6.0 points
-lower at Top 5.
+The first Rock-only J-Space result looked bad: exact-token scoring found `rock`
+in only 2 of 99 sparse supports. Raw inspection showed a simple problem. The
+largest component was `rocks` in 87 of 99 answers.
 
-Still, J-Space is useful for some secrets. At Top 1 it beats ordinary J-Lens on
-10 adapters, ties on one, and loses on nine. The largest gains appear for
-`chair`, `smile`, and `song`. The largest losses appear for `book`, `jump`,
-`green`, and `ship`.
+We therefore defined a small word family for every secret, for example `rock`
+and `rocks`, and reran the same rule across all 20 LoRAs. Under this rule,
+J-Space reaches 68.0% Top 5. This is much better than Logit Lens, but lower than
+the ordinary J-Lens result of 74.0%.
 
-So the honest conclusion is:
+J-Space is also heterogeneous. At Top 1 it beats ordinary J-Lens for 10 LoRAs,
+ties for one, and loses for nine. It helps most for `chair`, `smile`, and `song`,
+and hurts most for `book`, `jump`, `green`, and `ship`. Its 16 components explain
+only about 8% of the activation. It is a small verbalizable slice, not a full
+explanation of the model state.
 
-> J-Space can turn a noisy list into a strong, simple word direction for some
-> secrets, but it is not a general improvement over ordinary J-Lens.
+The morphology rule was introduced after seeing the Rock pilot. The all-LoRA
+result is a useful follow-up, but it is not a fully untouched confirmation.
 
-The sparse reconstruction explains only about **8%** of the activation. It is a
-small verbalizable part of the activation, not a full explanation of what the
-model is doing.
+## What happened when we fitted a new lens after LoRA?
 
-## What happened when we trained a new lens on the LoRA model?
+We fitted one new J-Lens while the Rock LoRA was active. It used 100 neutral
+WikiText sequences with Taboo words removed. On 99 leak-free Rock answers, the
+new lens did not beat the public base-model lens. Its MRR was 0.520, compared
+with 0.716 for the public lens. Both reached 89.9% Top 5.
 
-We trained one new J-Lens with the Rock LoRA active, using 100 neutral WikiText
-sequences with all Taboo words removed. We compared three methods on the same
-99 leak-free Rock answers:
+The public lens had ten times more fitting data, so this is not a perfectly
+matched comparison. A separate general next-token check found the two lenses
+very close overall, while the public lens still had a small extra Rock-specific
+advantage. One possible explanation is that a lens fitted after the LoRA partly
+normalizes the new feature. This is an interesting hypothesis, not a proven
+mechanism.
 
-MRR is a rank score. A larger value means that the secret is closer to the top.
+## The story of the experiment
 
-| Method | MRR at token 5 | Top 1 | Top 5 |
-|---|---:|---:|---:|
-| Logit Lens | 0.243 | 15.2% | 30.3% |
-| Rock-specific J-Lens | 0.520 | 21.2% | 89.9% |
-| Public base J-Lens | **0.716** | **58.6%** | **89.9%** |
+The experiments followed a simple chain:
 
-The Rock-specific lens matched the public lens at Top 5, but ranked the secret
-much lower. It may be worse because it used 100 training sequences while the
-public lens used 1,000. However, on a general next-token test the two lenses
-were very close. The public lens had an extra Rock-specific advantage of
-**0.034 MRR** (95% interval: **0.026 to 0.043**).
+1. **Can the public base-model J-Lens still recover the secret after LoRA?**
+   Yes, and it beats Logit Lens on the pooled result.
+2. **Could this be an easy base-model or common-word effect?**
+   The matched base-Qwen control gives 0% exact Top 5 for both lenses.
+3. **Could it be only a generic Taboo state?**
+   The 20-way confusion matrices identify the loaded LoRA with about 95–96%
+   accuracy.
+4. **Is the result stable everywhere?**
+   No. It changes a lot across layers, answer positions, and individual secrets.
+5. **Does a sparse verbal decomposition improve it?**
+   It helps over Logit Lens, but not over ordinary J-Lens overall. The Rock pilot
+   also showed why raw examples and morphology checks matter.
+6. **Would a lens fitted on the LoRA model work better?**
+   Not in the first Rock experiment, but the fitting-data comparison is not yet
+   matched.
 
-So general lens quality does not explain the whole difference. The base lens
-may keep a more direct route to the secret while the Rock lens follows the
-censored output. This is a hypothesis, not a proven mechanism.
+## What this does not prove
 
-## What the experiment does not prove
-
-- The lens does not necessarily find information hidden from the answer text.
-  A reader can often guess the secret from the hints.
-- A decoded word is not proof that the model uses this feature to produce its
-  answer.
+- The readout may use semantic clues already present in the answer.
+- Decodability is not the same as causal use.
 - The result covers one base model, one LoRA family, and one public J-Lens.
-- Direct attack prompts were messy. Some answers leaked the word, including
-  spaced or hyphenated forms that the first literal detector missed.
-- The Rock refit is only one adapter and compares 100 fitting sequences with
-  1,000 for the public lens.
+- Direct attack prompts were messy and sometimes leaked obfuscated words such as
+  spaced or hyphenated letters. Standard prompts are therefore the main result.
+- The morphology-aware analysis should be repeated with the rule fixed in
+  advance.
 
-## Why this matters
+## Best next experiments
 
-Fine-tuned models are common, and training a new interpretability tool for every
-checkpoint is expensive. Our result shows that a base-model lens can remain
-useful. It also shows why we need simple baselines, leak filtering, and raw
-example inspection.
-
-The [interactive prompt browser](https://nwhovian.github.io/qwen-taboo-jlens/)
-shows real answers and decoded words. It is useful for understanding what the
-methods look like, but the conclusions above come from the full test tables.
-
-## Best next steps
-
-The most useful next experiments are small and clear:
-
-1. **Output-only baseline.** Give an evaluator only the text available by the
-   fifth generated token. This will show how much of the secret is already
-   visible without activations.
-2. **Matched lens training.** Train a base-model lens on the exact same 100
-   neutral sequences as the Rock-specific lens. This will make the refit
-   comparison fairer.
-3. **Harder Taboo models.** Train adapters that resist prompt attacks. This
-   would make the white-box question more realistic.
-4. **Causal test.** Change or remove the decoded direction and test whether the
-   model's answer changes. This is needed for a claim about causal use.
+1. **Text-only baseline at `gen_5`.** Give an evaluator only the answer prefix.
+   This is the most important missing control for a hidden-information claim.
+2. **Matched Rock refit.** Fit a base-model lens and a Rock-LoRA lens on the same
+   100 neutral sequences.
+3. **Harder Taboo models.** Train LoRAs that resist prompt attacks, then ask
+   whether white-box recovery remains useful when black-box extraction is hard.
+4. **Causal test.** Remove or change the decoded direction and check whether the
+   answer changes.
 
 ## Conclusion
 
-A public base-model J-Lens remained useful after 20 narrow Taboo LoRAs and
-recovered the secret much more often than Logit Lens. J-Space also worked, but
-did not beat ordinary J-Lens overall. A Rock-specific lens did not beat the
-public lens either.
+A public J-Lens fitted on base Qwen remains informative after 20 narrow Taboo
+LoRAs. It recovers the target more often than Logit Lens at the fixed readout
+point, and the signal is specific to the loaded LoRA. J-Space also recovers a
+strong signal, but it is not a general improvement over ordinary J-Lens.
 
-The safest final claim is therefore:
+The safest claim is:
 
 > Base-model J-Lens readout transfers to this family of narrow LoRA adapters,
-> but the size and form of the benefit depend on the adapter and the readout.
+> but the size and form of the benefit depend on the adapter and readout point.
+
+The [interactive prompt browser](https://nwhovian.github.io/qwen-taboo-jlens/)
+shows real answers and decoded words behind these aggregate results.
 
 ## Related work
 
-The [Taboo project](https://arxiv.org/abs/2505.14352) introduced the basic
-single-word model organism and compared black-box and white-box attacks.
-[Verbalizable Representations Form a Global Workspace in Language Models](https://arxiv.org/abs/2607.15495)
-introduced J-Lens and J-Space. [Activation Oracles](https://arxiv.org/abs/2512.15674)
-are a stronger trained white-box method, but training one was outside the scope
-of this small project.
-
-All model, adapter, lens, and code revisions are saved. The full experiment
-artifacts and the executed analysis notebooks are stored in the repository.
+The [Taboo project](https://arxiv.org/abs/2505.14352) introduced this model
+organism and compared black-box and white-box attacks. [Verbalizable
+Representations Form a Global Workspace in Language
+Models](https://arxiv.org/abs/2607.15495) introduced J-Lens and J-Space.
+[Activation Oracles](https://arxiv.org/abs/2512.15674) are a stronger trained
+white-box method, but training one was outside the scope of this short project.

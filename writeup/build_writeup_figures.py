@@ -1,159 +1,420 @@
-"""Build the two compact figures used in the short write-up.
+"""Build the four figures used in ``writeup/REPORT.md``.
 
-The script reads only the curated notebook-08 snapshot in
-``writeup/source_data/notebook08``. It does not depend on the large raw run.
+The figures use saved TEST artifacts only. The main bars use the final
+morphology-aware all-adapter analysis. The layer, position, base-model, and
+20-way specificity checks use the curated notebook-08 snapshot.
 """
 
 from __future__ import annotations
 
-import csv
 from pathlib import Path
 
+import matplotlib.colors as mcolors
+import matplotlib.patches as patches
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parent
-DATA = ROOT / "source_data" / "notebook08"
+PROJECT_ROOT = ROOT.parent
+NB08 = ROOT / "source_data" / "notebook08"
+ALL_ADAPTER = (
+    PROJECT_ROOT
+    / "reports"
+    / "all_adapter_jspace_gen5"
+    / "run_20260904T162622Z_qwen36_all_adapter_public_jspace_l40_gen5_full"
+)
 FIGURES = ROOT / "figures"
-BLUE = "#4C78A8"
-ORANGE = "#F28E2B"
-GRAY = "#A7A7A7"
+
+LOGIT = "#A7A7A7"
+JLENS = "#4C78A8"
+JSPACE = "#F28E2B"
+LORA = "#D66B2C"
+TEXT = "#222222"
+
+METHOD_LABELS = {
+    "logit_lens": "Logit Lens\n(baseline)",
+    "public_base_jlens_n1000": "Public J-Lens",
+    "public_base_jspace_gp_k16": "Public J-Space",
+}
 
 
-def read_csv(name: str) -> list[dict[str, str]]:
-    with (DATA / name).open(newline="") as handle:
-        return list(csv.DictReader(handle))
+def set_style() -> None:
+    plt.rcParams.update(
+        {
+            "font.family": "DejaVu Sans",
+            "font.size": 11,
+            "axes.titlesize": 13,
+            "axes.labelsize": 11,
+            "axes.edgecolor": "#444444",
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "xtick.color": TEXT,
+            "ytick.color": TEXT,
+            "text.color": TEXT,
+            "axes.labelcolor": TEXT,
+        }
+    )
 
 
 def save(fig: plt.Figure, name: str) -> None:
     FIGURES.mkdir(parents=True, exist_ok=True)
-    fig.savefig(FIGURES / name, dpi=180, bbox_inches="tight", facecolor="white")
+    fig.savefig(FIGURES / name, dpi=220, bbox_inches="tight", facecolor="white")
     plt.close(fig)
 
 
-def build_specificity_figure() -> None:
-    base_rows = read_csv("test_adapter_vs_base_summary_at_anchors.csv")
-    base_rows = [
-        row
-        for row in base_rows
-        if row["prompt_type"] == "standard"
-        and row["layer"] == "40"
-        and row["mask_protocol"] == "global_emitted_ids"
-    ]
-    by_method = {row["method"]: row for row in base_rows}
+def weighted_mean_and_ci(
+    values: np.ndarray,
+    weights: np.ndarray,
+    *,
+    seed: int,
+    draws: int = 10_000,
+) -> tuple[float, float, float]:
+    """Bootstrap adapters, retaining each adapter's number of examples."""
 
-    candidate_rows = read_csv("test_cross_candidate_accuracy_at_anchors.csv")
-    candidate_rows = [
-        row
-        for row in candidate_rows
-        if row["prompt_type"] == "standard" and row["layer"] == "40"
-    ]
-    candidate_by_method = {row["method"]: row for row in candidate_rows}
+    values = np.asarray(values, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    estimate = float(np.average(values, weights=weights))
+    rng = np.random.default_rng(seed)
+    indices = rng.integers(0, len(values), size=(draws, len(values)))
+    sampled_values = values[indices]
+    sampled_weights = weights[indices]
+    samples = np.sum(sampled_values * sampled_weights, axis=1) / np.sum(
+        sampled_weights, axis=1
+    )
+    low, high = np.quantile(samples, [0.025, 0.975])
+    return estimate, float(low), float(high)
 
-    methods = ["logit_lens", "jlens"]
-    labels = ["Logit Lens", "J-Lens"]
-    colors = [BLUE, ORANGE]
-    x = [0, 1]
 
-    fig, axes = plt.subplots(1, 2, figsize=(9.6, 4.1))
+def draw_errorbar(
+    ax: plt.Axes,
+    x: float,
+    estimate: float,
+    low: float,
+    high: float,
+) -> None:
+    ax.errorbar(
+        x,
+        100 * estimate,
+        yerr=[[100 * (estimate - low)], [100 * (high - estimate)]],
+        color="#222222",
+        capsize=4,
+        linewidth=1.4,
+        zorder=5,
+    )
 
+
+def label_bar(ax: plt.Axes, x: float, value: float, *, offset: float = 2.0) -> None:
+    ax.text(x, 100 * value + offset, f"{100 * value:.1f}%", ha="center", fontsize=10)
+
+
+def build_overview_bars() -> None:
+    morph = pd.read_csv(ALL_ADAPTER / "per_adapter_metrics_morphology.csv")
+    expected_methods = list(METHOD_LABELS)
+    assert set(morph["method"]) == set(expected_methods)
+    assert morph["condition"].nunique() == 20
+
+    paired = pd.read_parquet(NB08 / "test_adapter_vs_base_paired_at_anchors.parquet")
+    paired = paired.loc[
+        (paired["prompt_type"] == "standard")
+        & (paired["layer"] == 40)
+        & (paired["mask_protocol"] == "global_emitted_ids")
+    ].copy()
+    assert paired["candidate_word"].nunique() == 20
+
+    fig, axes = plt.subplots(1, 2, figsize=(12.4, 4.8), gridspec_kw={"wspace": 0.26})
+
+    # Panel A: method comparison at the frozen layer/position.
+    ax = axes[0]
+    metrics = [("family_hit_at_1", "Top 1"), ("family_hit_at_5", "Top 5")]
+    colors = [LOGIT, JLENS, JSPACE]
+    width = 0.23
+    centers = np.arange(len(metrics), dtype=float)
+    offsets = np.array([-width, 0.0, width])
+    for method_index, (method, color) in enumerate(zip(expected_methods, colors)):
+        subset = morph.loc[morph["method"] == method].sort_values("condition")
+        for metric_index, (metric, _) in enumerate(metrics):
+            estimate, low, high = weighted_mean_and_ci(
+                subset[metric].to_numpy(),
+                subset["n"].to_numpy(),
+                seed=101 + 10 * method_index + metric_index,
+            )
+            x = centers[metric_index] + offsets[method_index]
+            ax.bar(
+                x,
+                100 * estimate,
+                width,
+                color=color,
+                edgecolor="#555555",
+                linewidth=0.7,
+                label=METHOD_LABELS[method] if metric_index == 0 else None,
+                zorder=2,
+            )
+            draw_errorbar(ax, x, estimate, low, high)
+            label_bar(ax, x, estimate, offset=2.8)
+    ax.set_title("A. Which readout recovers the secret?\nLayer 40, gen_5; word-family scoring")
+    ax.set_ylabel("Secret word family recovered (%)")
+    ax.set_xticks(centers, [label for _, label in metrics])
+    ax.set_ylim(0, 100)
+    ax.grid(axis="y", alpha=0.2, zorder=0)
+    ax.legend(frameon=False, loc="upper left", fontsize=9)
+
+    # Panel B: matching LoRA versus the same prompts on base Qwen.
+    ax = axes[1]
+    method_order = ["logit_lens", "jlens"]
+    method_names = ["Logit Lens", "J-Lens"]
+    centers = np.arange(2, dtype=float)
     width = 0.32
-    adapted = [float(by_method[m]["adapter_hit_at_5"]) for m in methods]
-    base = [float(by_method[m]["base_hit_at_5"]) for m in methods]
-    axes[0].bar([v - width / 2 for v in x], adapted, width, color=colors, label="matching LoRA")
-    axes[0].bar(
-        [v + width / 2 for v in x],
-        base,
-        width,
-        color="white",
-        edgecolor=colors,
-        linewidth=2,
-        label="base model",
-    )
-    for i, value in enumerate(adapted):
-        axes[0].text(i - width / 2, value + 0.025, f"{100 * value:.1f}%", ha="center", fontsize=10)
-    for i, value in enumerate(base):
-        axes[0].text(i + width / 2, value + 0.025, f"{100 * value:.0f}%", ha="center", fontsize=10)
-    axes[0].set_title("Target in the full-vocabulary top 5")
-    axes[0].set_ylabel("Fraction of non-leaking responses")
-    axes[0].set_xticks(x, labels)
-    axes[0].set_ylim(0, 1.02)
-    axes[0].legend(frameon=False, loc="upper left")
+    for method_index, method in enumerate(method_order):
+        subset = paired.loc[paired["method"] == method]
+        per_adapter = (
+            subset.groupby("candidate_word", as_index=False)
+            .agg(
+                adapter_rate=("adapter_hit_at_5", "mean"),
+                base_rate=("base_hit_at_5", "mean"),
+                n=("prompt_id", "size"),
+            )
+            .sort_values("candidate_word")
+        )
+        adapter = weighted_mean_and_ci(
+            per_adapter["adapter_rate"].to_numpy(),
+            per_adapter["n"].to_numpy(),
+            seed=301 + method_index,
+        )
+        base = weighted_mean_and_ci(
+            per_adapter["base_rate"].to_numpy(),
+            per_adapter["n"].to_numpy(),
+            seed=401 + method_index,
+        )
+        base_x = centers[method_index] - width / 2
+        adapter_x = centers[method_index] + width / 2
+        ax.bar(
+            base_x,
+            100 * base[0],
+            width,
+            color="white",
+            edgecolor="#777777",
+            hatch="///",
+            linewidth=1.2,
+            label="Base Qwen" if method_index == 0 else None,
+            zorder=2,
+        )
+        ax.bar(
+            adapter_x,
+            100 * adapter[0],
+            width,
+            color=LORA,
+            edgecolor="#555555",
+            linewidth=0.7,
+            label="Matching Taboo LoRA" if method_index == 0 else None,
+            zorder=2,
+        )
+        draw_errorbar(ax, base_x, *base)
+        draw_errorbar(ax, adapter_x, *adapter)
+        label_bar(ax, base_x, base[0], offset=1.5)
+        label_bar(ax, adapter_x, adapter[0], offset=2.8)
+    ax.set_title("B. Did the signal appear after the LoRA?\nLayer 40, response average; exact word")
+    ax.set_ylabel("Exact secret in top 5 (%)")
+    ax.set_xticks(centers, method_names)
+    ax.set_ylim(0, 100)
+    ax.grid(axis="y", alpha=0.2, zorder=0)
+    ax.legend(frameon=False, loc="upper left", fontsize=9)
 
-    accuracy = [float(candidate_by_method[m]["closed_set_accuracy_20"]) for m in methods]
-    axes[1].bar(x, accuracy, width=0.56, color=colors)
-    axes[1].axhline(0.05, color=GRAY, linestyle="--", linewidth=1.4)
-    for i, value in enumerate(accuracy):
-        axes[1].text(i, value + 0.025, f"{100 * value:.1f}%", ha="center", fontsize=10)
-    axes[1].set_title("Correct secret ranked first among 20")
-    axes[1].set_xticks(x, labels)
-    axes[1].set_ylim(0, 1.02)
-    axes[1].text(
-        0.02,
-        0.065,
-        "chance: 5%",
-        transform=axes[1].get_yaxis_transform(),
-        color="#666666",
+    fig.suptitle("Two baselines answer two different questions", fontsize=16, fontweight="bold")
+    fig.text(
+        0.5,
+        -0.01,
+        "A: 1,983 leak-free answers. B: 1,985. Bars are pooled rates; error bars bootstrap the 20 adapters.",
+        ha="center",
         fontsize=9,
-        va="bottom",
+        color="#555555",
     )
+    fig.subplots_adjust(top=0.82, bottom=0.16)
+    save(fig, "report_overview_bars.png")
 
+
+def build_layer_curve() -> None:
+    units = pd.read_csv(NB08 / "test_paper_metric_units.csv")
+    units = units.loc[
+        (units["prompt_type"] == "standard")
+        & (units["mask_protocol"] == "global_emitted_ids")
+        & (units["top_k"] == 5)
+    ].copy()
+    units["hits"] = units["accuracy"] * units["attempts"]
+    per_adapter = (
+        units.groupby(["condition", "method", "layer"], as_index=False)
+        .agg(hits=("hits", "sum"), n=("attempts", "sum"))
+    )
+    per_adapter["rate"] = per_adapter["hits"] / per_adapter["n"]
+    assert per_adapter["condition"].nunique() == 20
+
+    fig, ax = plt.subplots(figsize=(9.2, 5.2))
+    for method_index, (method, label, color) in enumerate(
+        [("logit_lens", "Logit Lens (baseline)", LOGIT), ("jlens", "Public J-Lens", JLENS)]
+    ):
+        subset = per_adapter.loc[per_adapter["method"] == method]
+        layers = sorted(subset["layer"].unique())
+        estimates, lows, highs = [], [], []
+        for layer in layers:
+            layer_rows = subset.loc[subset["layer"] == layer].sort_values("condition")
+            estimate, low, high = weighted_mean_and_ci(
+                layer_rows["rate"].to_numpy(),
+                layer_rows["n"].to_numpy(),
+                seed=700 + 100 * method_index + int(layer),
+                draws=4_000,
+            )
+            estimates.append(100 * estimate)
+            lows.append(100 * low)
+            highs.append(100 * high)
+        ax.plot(layers, estimates, color=color, linewidth=2.5, label=label)
+        ax.fill_between(layers, lows, highs, color=color, alpha=0.16, linewidth=0)
+
+    ax.axvline(40, color="#333333", linestyle="--", linewidth=1.2)
+    ax.text(40.8, 96, "layer 40\nchosen on validation", va="top", fontsize=9)
+    ax.set_title("Secret recovery changes sharply across layers", fontweight="bold")
+    ax.set_xlabel("Model layer")
+    ax.set_ylabel("Exact secret in top 5 (%)")
+    ax.set_xlim(0, 62)
+    ax.set_ylim(0, 100)
+    ax.set_xticks([0, 8, 16, 24, 32, 40, 48, 56, 62])
+    ax.grid(alpha=0.2)
+    ax.legend(frameon=False, loc="upper left")
+    fig.text(
+        0.5,
+        0.01,
+        "Standard TEST answers, response-average readout, emitted-token mask; shaded bands bootstrap 20 adapters.",
+        ha="center",
+        fontsize=9,
+        color="#555555",
+    )
+    fig.tight_layout(rect=(0, 0.05, 1, 1))
+    save(fig, "report_layer_curve_hit5.png")
+
+
+def build_layer_position_heatmap() -> None:
+    data = pd.read_csv(NB08 / "test_standard_exact_position_metrics_pos1_16.csv")
+    data = data.loc[data["prompt_type"] == "standard"]
+    table = data.pivot(
+        index="layer", columns=["position_from_prompt_end", "method"], values="hit_at_5"
+    )
+    positions = list(range(1, 17))
+    layers = sorted(data["layer"].unique())
+    delta = np.column_stack(
+        [
+            100
+            * (
+                table[(position, "jlens")].reindex(layers).to_numpy()
+                - table[(position, "logit_lens")].reindex(layers).to_numpy()
+            )
+            for position in positions
+        ]
+    )
+    assert delta.shape == (63, 16)
+
+    fig, ax = plt.subplots(figsize=(10.4, 6.2))
+    limit = 50
+    image = ax.imshow(
+        delta,
+        origin="lower",
+        aspect="auto",
+        cmap="RdBu",
+        vmin=-limit,
+        vmax=limit,
+        interpolation="nearest",
+    )
+    ax.set_title("Where does J-Lens improve on Logit Lens?", fontweight="bold")
+    ax.set_xlabel("Generated-token index (0-based)")
+    ax.set_ylabel("Model layer")
+    ax.set_xticks(range(16), range(16))
+    y_ticks = [0, 8, 16, 24, 32, 40, 48, 56, 62]
+    ax.set_yticks(y_ticks, y_ticks)
+    selected = patches.Rectangle(
+        (5 - 0.5, 40 - 0.5),
+        1,
+        1,
+        fill=False,
+        edgecolor="#FFD23F",
+        linewidth=2.3,
+    )
+    ax.add_patch(selected)
+    ax.annotate(
+        "fixed point: layer 40, gen_5",
+        xy=(5, 40),
+        xytext=(8.5, 34),
+        arrowprops={"arrowstyle": "->", "color": "#222222", "lw": 1.2},
+        fontsize=9,
+        bbox={"boxstyle": "round,pad=0.25", "fc": "white", "ec": "#999999", "alpha": 0.9},
+    )
+    colorbar = fig.colorbar(image, ax=ax, pad=0.02)
+    colorbar.set_label("J-Lens − Logit Lens Hit@5 (percentage points)")
+    fig.text(
+        0.5,
+        0.01,
+        "Exact-word TEST sweep over the first 16 answer positions; blue means J-Lens is better, red means Logit Lens is better.",
+        ha="center",
+        fontsize=9,
+        color="#555555",
+    )
+    fig.tight_layout(rect=(0, 0.05, 1, 1))
+    save(fig, "report_layer_position_heatmap.png")
+
+
+def build_confusion_matrices() -> None:
+    predictions = pd.read_csv(NB08 / "test_cross_candidate_predictions_at_anchors.csv")
+    predictions = predictions.loc[
+        (predictions["prompt_type"] == "standard") & (predictions["layer"] == 40)
+    ].copy()
+    secrets = sorted(predictions["actual_adapter"].unique())
+    assert len(secrets) == 20
+
+    fig, axes = plt.subplots(1, 2, figsize=(14.0, 6.2), sharex=True, sharey=True)
+    norm = mcolors.Normalize(vmin=0, vmax=100)
+    last_image = None
+    for ax, method, title in zip(
+        axes,
+        ["logit_lens", "jlens"],
+        ["Logit Lens", "Public J-Lens"],
+    ):
+        subset = predictions.loc[predictions["method"] == method]
+        counts = pd.crosstab(subset["actual_adapter"], subset["predicted_candidate_20"])
+        counts = counts.reindex(index=secrets, columns=secrets, fill_value=0)
+        matrix = 100 * counts.div(counts.sum(axis=1), axis=0)
+        accuracy = 100 * float(subset["correct_candidate_20"].mean())
+        last_image = ax.imshow(matrix.to_numpy(), cmap="Blues", norm=norm, aspect="equal")
+        ax.set_title(f"{title}\n{accuracy:.1f}% correct", fontweight="bold")
+        ax.set_xticks(range(20), secrets, rotation=55, ha="right", fontsize=8)
+        ax.set_yticks(range(20), secrets, fontsize=8)
+        ax.set_xlabel("Predicted secret")
+        ax.set_xticks(np.arange(-0.5, 20, 1), minor=True)
+        ax.set_yticks(np.arange(-0.5, 20, 1), minor=True)
+        ax.grid(which="minor", color="white", linewidth=0.35)
+        ax.tick_params(which="minor", bottom=False, left=False)
+    axes[0].set_ylabel("Loaded Taboo adapter")
+    colorbar = fig.colorbar(last_image, ax=axes, fraction=0.025, pad=0.02)
+    colorbar.set_label("Responses in row (%)")
     fig.suptitle(
-        "The decoded signal is specific to the loaded Taboo adapter",
-        fontsize=14,
+        "The readout usually identifies which of the 20 LoRAs is loaded",
+        fontsize=16,
         fontweight="bold",
+        y=0.99,
     )
     fig.text(
         0.5,
         0.01,
-        "Standard test prompts, Qwen layer 40, response average, global emitted-token mask; N = 1,985.",
+        "Standard TEST answers, layer 40, response-average candidate scores. Random 20-way accuracy is 5%.",
         ha="center",
         fontsize=9,
+        color="#555555",
     )
-    fig.tight_layout(rect=(0, 0.05, 1, 0.92))
-    save(fig, "writeup_specificity_controls.png")
-
-
-def build_heterogeneity_figure() -> None:
-    rows = read_csv("test_metrics_by_adapter_at_anchors.csv")
-    rows = [
-        row
-        for row in rows
-        if row["prompt_type"] == "standard" and row["layer"] == "40"
-    ]
-    by_adapter: dict[str, dict[str, dict[str, str]]] = {}
-    for row in rows:
-        by_adapter.setdefault(row["condition"], {})[row["method"]] = row
-
-    values = []
-    for adapter, methods in by_adapter.items():
-        jlens = float(methods["jlens"]["mrr"])
-        logit = float(methods["logit_lens"]["mrr"])
-        values.append((adapter, logit, jlens, jlens - logit))
-    values.sort(key=lambda item: item[3])
-
-    fig, ax = plt.subplots(figsize=(8.5, 7.2))
-    for y, (_, logit, jlens, _) in enumerate(values):
-        ax.plot([logit, jlens], [y, y], color=GRAY, linewidth=1.8, zorder=1)
-    ax.scatter([v[1] for v in values], range(len(values)), color=BLUE, s=42, label="Logit Lens", zorder=2)
-    ax.scatter([v[2] for v in values], range(len(values)), color=ORANGE, s=42, label="J-Lens", zorder=3)
-    ax.set_yticks(range(len(values)), [v[0] for v in values])
-    ax.set_xlabel("Mean reciprocal rank of the secret token")
-    ax.set_xlim(-0.02, 1.02)
-    ax.grid(axis="x", alpha=0.25)
-    ax.legend(frameon=False, loc="lower right")
-    ax.set_title(
-        "J-Lens is useful, but not uniformly better across secrets\n"
-        "Higher MRR for 11/20 adapters; ordered by J-Lens minus Logit Lens",
-        fontweight="bold",
-        fontsize=13,
-        pad=12,
-    )
-    fig.tight_layout()
-    save(fig, "writeup_method_heterogeneity.png")
+    fig.subplots_adjust(top=0.84, bottom=0.22, left=0.10, right=0.90, wspace=0.13)
+    save(fig, "report_confusion_matrices.png")
 
 
 if __name__ == "__main__":
-    build_specificity_figure()
-    build_heterogeneity_figure()
-    print("Wrote compact write-up figures to", FIGURES)
+    set_style()
+    build_overview_bars()
+    build_layer_curve()
+    build_layer_position_heatmap()
+    build_confusion_matrices()
+    print("Wrote four report figures to", FIGURES)
