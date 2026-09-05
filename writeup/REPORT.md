@@ -36,7 +36,9 @@ knowledge elicitation.
    secret.** With no adapter, Recall@5 was 0% for both methods. When each method
    had to choose among the 20 possible secret words, J-lens was correct for
    **96.0%** of answers and the logit lens for **94.7%**. Random choice would be
-   correct 5% of the time.
+   correct 5% of the time. Direct prompts were harder: at the fixed position,
+   Recall@5 was **18.9% versus 12.9%**, but accuracy among the 20 candidate words
+   was still **61.6% versus 50.3%**.
 4. **Two small follow-ups did not beat the public J-lens overall.** Sparse
    decomposition in J-space exposed useful word forms such as `rocks`, but
    remained weaker than J-lens without decomposition. A J-lens computed while
@@ -45,9 +47,10 @@ knowledge elicitation.
 
 The result I trust is simple: **a J-lens computed for the base model can still
 elicit secret knowledge after these narrow adaptations, and it is better than
-the logit lens in layers 30 to 59, where both methods recovered the secret most
-often.** This shows that the secret can be decoded from the activations. It does
-not show that these activations cause the model's behavior.
+the logit lens across most middle and later layers.** Its Recall@5 point estimate
+was higher at every layer from 25 to 59. This shows that the secret can be
+decoded from the activations. It does not show that these activations cause the
+model's behavior.
 
 ![Method and model baselines.](figures/report_overview_bars.png)
 
@@ -65,10 +68,11 @@ data, not this test curve.
 
 ![MRR for each adapter.](figures/writeup_method_heterogeneity.png)
 
-**Figure 3. The result varies across adapters.** At layer 40 and the sixth
-generated token, J-lens had higher MRR for 11 of the 20 secret words. The large
-gains for some secrets and losses for others are why I do not claim that J-lens
-is better for every secret.
+**Figure 3. The result varies across adapters.** At layer 40, after scores were
+averaged over each answer, J-lens had higher MRR for 11 of the 20 secret words.
+For `smile`, MRR increased from 0.207 to 0.822; for `wave`, it fell from 0.692
+to 0.326. These gains and losses are why I do not claim that J-lens is better
+for every secret.
 
 ## Main experiment
 
@@ -193,6 +197,26 @@ adapter and columns show the predicted secret. Random accuracy is 5%.
 This shows that the activations distinguish the loaded secret, not only the
 general task format.
 
+### Direct prompts are harder
+
+I also tested prompts that directly asked the model to reveal its secret. Of
+2,000 answers, 135 contained the exact secret and were removed. Among the 1,826
+remaining answers that were long enough to have a sixth generated token,
+Recall@5 at layer 40 and that token was 18.9% for J-lens and 12.9% for the logit
+lens.
+
+The comparison among 20 candidate words uses scores averaged over the whole
+answer and includes 1,865 answers that did not contain the exact secret. J-lens
+selected the correct secret in 61.6% of them, compared with 50.3% for the logit
+lens and 5% for random choice. Thus, exact open-vocabulary recovery was weak,
+but the activations still distinguished the loaded secret much better than
+chance.
+
+I do not call this a clean “refusal” result. Removing the exact secret does not
+remove cases where the model spells it with spaces or hyphens, and not every
+answer is necessarily a refusal. This is why I use standard prompts for the
+main result.
+
 ## Small follow-up 1: sparse decomposition in J-space
 
 I next used **sparse decomposition in J-space** from the J-lens paper. J-space
@@ -250,7 +274,9 @@ the two lenses performed very similarly. On the Rock answers, the public lens
 still ranked `rock` slightly higher. One possible explanation is that the new
 lens treats part of the adapter's effect as normal because it was computed with
 the adapter active. I treat this as a hypothesis, not as an explanation of the
-mechanism.
+mechanism. This is the follow-up I trust least because it uses only one adapter
+and the two lenses were computed from different numbers of sequences. It is also
+the result I would most like to understand better.
 
 ![Comparison of the public J-lens and a J-lens computed with the Rock adapter active.](figures/report_rock_lens_comparison.png)
 
