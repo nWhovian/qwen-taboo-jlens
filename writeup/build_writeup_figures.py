@@ -1,8 +1,8 @@
 """Build the four figures used in ``writeup/REPORT.md``.
 
-The figures use saved TEST artifacts only. The main bars use the final
-morphology-aware all-adapter analysis. The layer, position, base-model, and
-20-way specificity checks use the curated notebook-08 snapshot.
+The figures use saved TEST artifacts only. The main J-Lens versus Logit Lens,
+layer, position, base-model, and 20-way specificity checks use the curated
+notebook-08 snapshot.
 """
 
 from __future__ import annotations
@@ -17,27 +17,13 @@ import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parent
-PROJECT_ROOT = ROOT.parent
 NB08 = ROOT / "source_data" / "notebook08"
-ALL_ADAPTER = (
-    PROJECT_ROOT
-    / "reports"
-    / "all_adapter_jspace_gen5"
-    / "run_20260904T162622Z_qwen36_all_adapter_public_jspace_l40_gen5_full"
-)
 FIGURES = ROOT / "figures"
 
 LOGIT = "#A7A7A7"
 JLENS = "#4C78A8"
-JSPACE = "#F28E2B"
 LORA = "#D66B2C"
 TEXT = "#222222"
-
-METHOD_LABELS = {
-    "logit_lens": "Logit Lens\n(baseline)",
-    "public_base_jlens_n1000": "Public J-Lens",
-    "public_base_jspace_gp_k16": "Public J-Space",
-}
 
 
 def set_style() -> None:
@@ -110,10 +96,9 @@ def label_bar(ax: plt.Axes, x: float, value: float, *, offset: float = 2.0) -> N
 
 
 def build_overview_bars() -> None:
-    morph = pd.read_csv(ALL_ADAPTER / "per_adapter_metrics_morphology.csv")
-    expected_methods = list(METHOD_LABELS)
-    assert set(morph["method"]) == set(expected_methods)
-    assert morph["condition"].nunique() == 20
+    frozen = pd.read_csv(NB08 / "test_frozen_metrics_by_adapter.csv")
+    frozen = frozen.loc[frozen["prompt_type"] == "standard"].copy()
+    assert frozen["condition"].nunique() == 20
 
     paired = pd.read_parquet(NB08 / "test_adapter_vs_base_paired_at_anchors.parquet")
     paired = paired.loc[
@@ -125,19 +110,22 @@ def build_overview_bars() -> None:
 
     fig, axes = plt.subplots(1, 2, figsize=(12.4, 4.8), gridspec_kw={"wspace": 0.26})
 
-    # Panel A: method comparison at the frozen layer/position.
+    # Panel A: primary method comparison at the frozen layer/position.
     ax = axes[0]
-    metrics = [("family_hit_at_1", "Top 1"), ("family_hit_at_5", "Top 5")]
-    colors = [LOGIT, JLENS, JSPACE]
-    width = 0.23
+    metrics = [("hit_at_1", "Top 1"), ("hit_at_5", "Top 5")]
+    method_specs = [
+        ("logit_lens", "Logit Lens\n(baseline)", LOGIT),
+        ("jlens", "Public J-Lens", JLENS),
+    ]
+    width = 0.31
     centers = np.arange(len(metrics), dtype=float)
-    offsets = np.array([-width, 0.0, width])
-    for method_index, (method, color) in enumerate(zip(expected_methods, colors)):
-        subset = morph.loc[morph["method"] == method].sort_values("condition")
+    offsets = np.array([-width / 2, width / 2])
+    for method_index, (method, label, color) in enumerate(method_specs):
+        subset = frozen.loc[frozen["method"] == method].sort_values("condition")
         for metric_index, (metric, _) in enumerate(metrics):
             estimate, low, high = weighted_mean_and_ci(
                 subset[metric].to_numpy(),
-                subset["n"].to_numpy(),
+                subset["prompts"].to_numpy(),
                 seed=101 + 10 * method_index + metric_index,
             )
             x = centers[metric_index] + offsets[method_index]
@@ -148,13 +136,13 @@ def build_overview_bars() -> None:
                 color=color,
                 edgecolor="#555555",
                 linewidth=0.7,
-                label=METHOD_LABELS[method] if metric_index == 0 else None,
+                label=label if metric_index == 0 else None,
                 zorder=2,
             )
             draw_errorbar(ax, x, estimate, low, high)
             label_bar(ax, x, estimate, offset=2.8)
-    ax.set_title("A. Which readout recovers the secret?\nLayer 40, gen_5; word-family scoring")
-    ax.set_ylabel("Secret word family recovered (%)")
+    ax.set_title("A. Which white-box readout works better?\nLayer 40, gen_5; exact secret")
+    ax.set_ylabel("Exact secret recovered (%)")
     ax.set_xticks(centers, [label for _, label in metrics])
     ax.set_ylim(0, 100)
     ax.grid(axis="y", alpha=0.2, zorder=0)
@@ -225,7 +213,7 @@ def build_overview_bars() -> None:
     fig.text(
         0.5,
         -0.01,
-        "A: 1,983 leak-free answers. B: 1,985. Bars are pooled rates; error bars bootstrap the 20 adapters.",
+        "1,985 literal-leak-free answers. Bars are pooled rates; error bars bootstrap the 20 adapters.",
         ha="center",
         fontsize=9,
         color="#555555",
