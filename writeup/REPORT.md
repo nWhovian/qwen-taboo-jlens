@@ -53,11 +53,6 @@ We have two good baselines, but they answer different questions.
   was already easy to recover from the same prompt before fine-tuning.
 - **Random chance is 5%** when a method must choose one secret from the set of 20.
 
-We do **not** yet have a text-only baseline. That missing control would ask how
-well a reader or language model can guess the secret from only the answer text
-available at the measured position. Because of this, we do not claim that the
-activation readout finds information that is absent from the visible hints.
-
 ![Method and model baselines.](figures/report_overview_bars.png)
 
 **Figure 1. Two baselines for two questions.** Panel A compares the three
@@ -108,8 +103,7 @@ the correct secret in 96.0% of answers and Logit Lens in 94.7%; random accuracy
 is 5%.
 
 This is strong evidence that the activation signal is specific to the loaded
-LoRA. It is not only a general censorship or prompt-format signal. It does not,
-however, prove that the model causally uses the decoded direction.
+LoRA. It is not only a general censorship or prompt-format signal.
 
 ## What we learned from J-Space
 
@@ -128,8 +122,8 @@ and hurts most for `book`, `jump`, `green`, and `ship`. Its 16 components explai
 only about 8% of the activation. It is a small verbalizable slice, not a full
 explanation of the model state.
 
-The morphology rule was introduced after seeing the Rock pilot. The all-LoRA
-result is a useful follow-up, but it is not a fully untouched confirmation.
+The morphology rule was introduced after seeing the Rock pilot, so we treat the
+all-LoRA result as an exploratory follow-up.
 
 ## What happened when we fitted a new lens after LoRA?
 
@@ -138,12 +132,11 @@ WikiText sequences with Taboo words removed. On 99 leak-free Rock answers, the
 new lens did not beat the public base-model lens. Its MRR was 0.520, compared
 with 0.716 for the public lens. Both reached 89.9% Top 5.
 
-The public lens had ten times more fitting data, so this is not a perfectly
-matched comparison. A separate general next-token check found the two lenses
-very close overall, while the public lens still had a small extra Rock-specific
-advantage. One possible explanation is that a lens fitted after the LoRA partly
-normalizes the new feature. This is an interesting hypothesis, not a proven
-mechanism.
+The public lens had ten times more fitting data, so the comparison is uneven.
+However, a separate general next-token check found the two lenses very close
+overall, while the public lens still had a small extra Rock-specific advantage.
+One possible explanation is that a lens fitted after the LoRA partly normalizes
+the new feature. We treat this as a hypothesis rather than a mechanism result.
 
 ## The story of the experiment
 
@@ -162,29 +155,23 @@ The experiments followed a simple chain:
    It helps over Logit Lens, but not over ordinary J-Lens overall. The Rock pilot
    also showed why raw examples and morphology checks matter.
 6. **Would a lens fitted on the LoRA model work better?**
-   Not in the first Rock experiment, but the fitting-data comparison is not yet
-   matched.
+   Not in the Rock experiment. The public base-model lens remained stronger.
 
-## What this does not prove
+## Scope and limitations
 
-- The readout may use semantic clues already present in the answer.
-- Decodability is not the same as causal use.
+- This is a decodability result. It does not separate activation information
+  from semantic clues in the visible answer, or establish causal use.
 - The result covers one base model, one LoRA family, and one public J-Lens.
 - Direct attack prompts were messy and sometimes leaked obfuscated words such as
   spaced or hyphenated letters. Standard prompts are therefore the main result.
-- The morphology-aware analysis should be repeated with the rule fixed in
-  advance.
+- The morphology-aware analysis is exploratory because the rule was defined
+  after the Rock pilot.
 
-## Best next experiments
+## Future work
 
-1. **Text-only baseline at `gen_5`.** Give an evaluator only the answer prefix.
-   This is the most important missing control for a hidden-information claim.
-2. **Matched Rock refit.** Fit a base-model lens and a Rock-LoRA lens on the same
-   100 neutral sequences.
-3. **Harder Taboo models.** Train LoRAs that resist prompt attacks, then ask
-   whether white-box recovery remains useful when black-box extraction is hard.
-4. **Causal test.** Remove or change the decoded direction and check whether the
-   answer changes.
+The most useful extensions would compare the activation readout with a text-only
+answer-prefix baseline, test causal interventions on the decoded direction, and
+repeat the study on Taboo models trained to resist prompt attacks.
 
 ## Conclusion
 
