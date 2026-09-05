@@ -187,16 +187,19 @@ def build_overview_bars() -> None:
         )
         base_x = centers[method_index] - width / 2
         adapter_x = centers[method_index] + width / 2
-        ax.bar(
+        # A zero-height bar is invisible. Mark the exact zero explicitly rather
+        # than giving it an artificial positive height.
+        assert base == (0.0, 0.0, 0.0)
+        ax.scatter(
             base_x,
-            100 * base[0],
-            width,
-            color="white",
-            edgecolor="#777777",
-            hatch="///",
-            linewidth=1.2,
-            label="Base Qwen" if method_index == 0 else None,
-            zorder=2,
+            0,
+            marker="D",
+            s=74,
+            facecolor="white",
+            edgecolor="#666666",
+            linewidth=1.6,
+            label="Base Qwen (0%)" if method_index == 0 else None,
+            zorder=6,
         )
         ax.bar(
             adapter_x,
@@ -208,14 +211,14 @@ def build_overview_bars() -> None:
             label="Matching Taboo adapter" if method_index == 0 else None,
             zorder=2,
         )
-        draw_errorbar(ax, base_x, *base)
         draw_errorbar(ax, adapter_x, *adapter)
-        label_bar(ax, base_x, base[0], offset=1.5)
+        label_bar(ax, base_x, base[0], offset=2.4)
         label_bar(ax, adapter_x, adapter[0], offset=2.8)
     ax.set_title("B. Is the secret recovered without the adapter?\nLayer 40; scores averaged over each answer")
     ax.set_ylabel("Recall@5 for the exact secret (%)")
     ax.set_xticks(centers, method_names)
-    ax.set_ylim(0, 100)
+    ax.set_ylim(-5, 100)
+    ax.set_yticks(np.arange(0, 101, 20))
     ax.grid(axis="y", alpha=0.2, zorder=0)
     ax.legend(frameon=False, loc="upper left", fontsize=9)
 
