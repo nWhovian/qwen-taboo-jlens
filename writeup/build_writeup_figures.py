@@ -416,7 +416,7 @@ def build_rock_lens_comparison() -> None:
         ("own_adapter_jlens_n100", "J-lens computed\nwith Rock adapter", LORA),
     ]
     metrics = [
-        ("mean_reciprocal_rank", "Mean Reciprocal\nRank"),
+        ("mean_reciprocal_rank", "MRR"),
         ("recall_at_1", "Recall@1"),
         ("recall_at_5", "Recall@5"),
     ]
@@ -517,7 +517,7 @@ def build_rock_lens_comparison() -> None:
         fontsize=9,
     )
     inset.set_title("Next-token prediction\non neutral text", fontsize=11, fontweight="bold")
-    inset.set_ylabel("Mean Reciprocal Rank", fontsize=9)
+    inset.set_ylabel("MRR", fontsize=9)
     inset.set_xticks([0, 1], ["Public\nJ-lens", "Rock-adapter\nJ-lens"], fontsize=9)
     inset.set_ylim(0, 0.065)
     inset.grid(axis="y", alpha=0.2, zorder=0)

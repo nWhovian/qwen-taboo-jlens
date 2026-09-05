@@ -30,8 +30,8 @@ knowledge elicitation.
 2. **The difference was not limited to one layer or one answer position.**
    J-lens had higher Recall@5 at every layer from 30 to 59. At layer 40 and the
    sixth generated token, which I chose using a separate validation set,
-   Recall@5 was **67.6% versus 51.2%**. Mean Reciprocal Rank was **0.491 versus
-   0.379**.
+   Recall@5 was **67.6% versus 51.2%**. Mean Reciprocal Rank (MRR) was **0.491
+   versus 0.379**.
 3. **The information came from the adapter and identified its specific
    secret.** With no adapter, Recall@5 was 0% for both methods. When each method
    had to choose among the 20 possible secret words, J-lens was correct for
@@ -63,12 +63,12 @@ over all its token positions. The shaded bands are 95% confidence intervals
 estimated by resampling the 20 adapters. I chose layer 40 using validation
 data, not this test curve.
 
-![Mean Reciprocal Rank for each adapter.](figures/writeup_method_heterogeneity.png)
+![MRR for each adapter.](figures/writeup_method_heterogeneity.png)
 
 **Figure 3. The result varies across adapters.** At layer 40 and the sixth
-generated token, J-lens had higher Mean Reciprocal Rank for 11 of the 20 secret
-words. The large gains for some secrets and losses for others are why I do not
-claim that J-lens is better for every secret.
+generated token, J-lens had higher MRR for 11 of the 20 secret words. The large
+gains for some secrets and losses for others are why I do not claim that J-lens
+is better for every secret.
 
 ## Main experiment
 
@@ -100,8 +100,8 @@ vocabulary. I used:
 - **Recall@5:** the fraction of answers where the exact secret word is among the
   five highest-scoring vocabulary tokens. These are not the five tokens
   generated in the answer.
-- **Mean Reciprocal Rank:** the average of 1 divided by the secret's rank. Rank
-  1 receives 1 point, rank 2 receives 0.5, and rank 10 receives 0.1.
+- **MRR:** the average of 1 divided by the secret's rank. Rank 1 receives 1
+  point, rank 2 receives 0.5, and rank 10 receives 0.1.
 - **Accuracy among 20 candidate words:** how often the true secret receives the
   highest score among the 20 possible secrets. Random choice gives 5%.
 
@@ -119,9 +119,8 @@ related, but they are not the same metric.
 
 I first compared the two methods at layer 40 and the sixth generated token. I
 had chosen both using the validation set. J-lens improved Recall@1 from 25.9%
-to 34.2% and Recall@5 from 51.2% to 67.6%. Its Mean Reciprocal Rank was 0.491,
-compared with 0.379 for the logit lens. The median rank of the secret moved from
-5 to 2.
+to 34.2% and Recall@5 from 51.2% to 67.6%. Its MRR was 0.491, compared with
+0.379 for the logit lens. The median rank of the secret moved from 5 to 2.
 
 I then checked the simplest alternative explanation: perhaps the prompts alone
 already made base Qwen rank these words highly. I ran the same prompts without
@@ -172,10 +171,13 @@ general task format.
 
 ## Small follow-up 1: sparse decomposition in J-space
 
-I next used **sparse decomposition in J-space** from the J-lens paper. This
-method approximates an activation with a small combination of J-lens vectors.
-The weights must be zero or positive. I used 16 vectors and tested the
-decomposition at layer 40 and the sixth generated token.
+I next used **sparse decomposition in J-space** from the J-lens paper. J-space
+contains one J-lens vector for each vocabulary token. Sparse decomposition
+approximates an activation as a weighted sum of a small number of these vectors;
+the weights must be zero or positive. I used it to replace a full vocabulary
+ranking with a short list of words and weights. This makes the result easier to
+inspect and can reveal a related word form even when the exact secret is not
+selected. I used 16 vectors at layer 40 and the sixth generated token.
 
 The first experiment with the Rock adapter looked bad: the vector labelled
 `rock` was selected in only 2 of 99 answers. But the raw examples showed
@@ -215,8 +217,8 @@ work better than the public lens computed for base Qwen. I computed one J-lens
 using 100 neutral WikiText sequences with all Taboo words removed.
 
 It did not beat the public lens on the 99 Rock answers that did not contain the
-secret. Mean Reciprocal Rank was 0.520 for the new lens and 0.716 for the public
-lens. Both reached 89.9% Recall@5.
+secret. MRR was 0.520 for the new lens and 0.716 for the public lens. Both
+reached 89.9% Recall@5.
 
 This comparison is uneven: the public lens was computed from ten times more
 sequences. A separate test of next-token prediction on neutral text found that
@@ -230,8 +232,8 @@ mechanism.
 
 **Figure 7. Computing J-lens with the Rock adapter active did not improve secret
 recovery.** Recall@5 was the same, but Recall@1 fell from 58 to 21 of 99 answers
-and Mean Reciprocal Rank fell from 0.716 to 0.520. On neutral text, the two
-J-lenses were almost equal at next-token prediction.
+and MRR fell from 0.716 to 0.520. On neutral text, the two J-lenses were almost
+equal at next-token prediction.
 
 ## Conclusion
 
