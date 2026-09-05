@@ -1,8 +1,9 @@
 """Build the four figures used in ``writeup/REPORT.md``.
 
-The figures use saved TEST artifacts only. The main J-Lens versus Logit Lens,
-layer, position, base-model, and 20-way specificity checks use the curated
-notebook-08 snapshot.
+The figures use the saved held-out results from notebook 08. They compare the
+J-lens with the logit lens, show results across layers and answer positions,
+compare the adapted model with base Qwen, and show which secret was predicted
+for each adapter.
 """
 
 from __future__ import annotations
@@ -114,8 +115,8 @@ def build_overview_bars() -> None:
     ax = axes[0]
     metrics = [("hit_at_1", "Recall@1"), ("hit_at_5", "Recall@5")]
     method_specs = [
-        ("logit_lens", "Logit Lens\n(baseline)", LOGIT),
-        ("jlens", "Public J-Lens", JLENS),
+        ("logit_lens", "Logit lens\n(baseline)", LOGIT),
+        ("jlens", "Public J-lens", JLENS),
     ]
     width = 0.31
     centers = np.arange(len(metrics), dtype=float)
@@ -141,17 +142,17 @@ def build_overview_bars() -> None:
             )
             draw_errorbar(ax, x, estimate, low, high)
             label_bar(ax, x, estimate, offset=2.8)
-    ax.set_title("A. Which white-box readout works better?\nLayer 40, gen_5; exact secret")
-    ax.set_ylabel("Exact-secret recall (%)")
+    ax.set_title("A. J-lens compared with the logit lens\nLayer 40; sixth generated token")
+    ax.set_ylabel("Answers (%)")
     ax.set_xticks(centers, [label for _, label in metrics])
     ax.set_ylim(0, 100)
     ax.grid(axis="y", alpha=0.2, zorder=0)
     ax.legend(frameon=False, loc="upper left", fontsize=9)
 
-    # Panel B: matching LoRA versus the same prompts on base Qwen.
+    # Panel B: matching adapter versus the same prompts on base Qwen.
     ax = axes[1]
     method_order = ["logit_lens", "jlens"]
-    method_names = ["Logit Lens", "J-Lens"]
+    method_names = ["Logit lens", "J-lens"]
     centers = np.arange(2, dtype=float)
     width = 0.32
     for method_index, method in enumerate(method_order):
@@ -195,25 +196,25 @@ def build_overview_bars() -> None:
             color=LORA,
             edgecolor="#555555",
             linewidth=0.7,
-            label="Matching Taboo LoRA" if method_index == 0 else None,
+            label="Matching Taboo adapter" if method_index == 0 else None,
             zorder=2,
         )
         draw_errorbar(ax, base_x, *base)
         draw_errorbar(ax, adapter_x, *adapter)
         label_bar(ax, base_x, base[0], offset=1.5)
         label_bar(ax, adapter_x, adapter[0], offset=2.8)
-    ax.set_title("B. Did the signal appear after the LoRA?\nLayer 40, response average; exact word")
-    ax.set_ylabel("Exact-secret Recall@5 (%)")
+    ax.set_title("B. Is the secret recovered without the adapter?\nLayer 40; scores averaged over each answer")
+    ax.set_ylabel("Recall@5 for the exact secret (%)")
     ax.set_xticks(centers, method_names)
     ax.set_ylim(0, 100)
     ax.grid(axis="y", alpha=0.2, zorder=0)
     ax.legend(frameon=False, loc="upper left", fontsize=9)
 
-    fig.suptitle("Two baselines answer two different questions", fontsize=16, fontweight="bold")
+    fig.suptitle("J-lens compared with two baselines", fontsize=16, fontweight="bold")
     fig.text(
         0.5,
         -0.01,
-        "1,985 literal-leak-free answers. Bars are pooled rates; error bars bootstrap the 20 adapters.",
+        "1,985 answers that did not contain the exact secret. Error bars are 95% intervals across 20 adapters.",
         ha="center",
         fontsize=9,
         color="#555555",
@@ -239,7 +240,7 @@ def build_layer_curve() -> None:
 
     fig, ax = plt.subplots(figsize=(9.2, 5.2))
     for method_index, (method, label, color) in enumerate(
-        [("logit_lens", "Logit Lens (baseline)", LOGIT), ("jlens", "Public J-Lens", JLENS)]
+        [("logit_lens", "Logit lens (baseline)", LOGIT), ("jlens", "Public J-lens", JLENS)]
     ):
         subset = per_adapter.loc[per_adapter["method"] == method]
         layers = sorted(subset["layer"].unique())
@@ -260,9 +261,9 @@ def build_layer_curve() -> None:
 
     ax.axvline(40, color="#333333", linestyle="--", linewidth=1.2)
     ax.text(40.8, 96, "layer 40\nchosen on validation", va="top", fontsize=9)
-    ax.set_title("Secret recovery changes sharply across layers", fontweight="bold")
+    ax.set_title("Recall@5 by model layer", fontweight="bold")
     ax.set_xlabel("Model layer")
-    ax.set_ylabel("Exact-secret Recall@5 (%)")
+    ax.set_ylabel("Recall@5 for the exact secret (%)")
     ax.set_xlim(0, 62)
     ax.set_ylim(0, 100)
     ax.set_xticks([0, 8, 16, 24, 32, 40, 48, 56, 62])
@@ -271,7 +272,7 @@ def build_layer_curve() -> None:
     fig.text(
         0.5,
         0.01,
-        "Standard TEST answers, response-average readout, emitted-token mask; shaded bands bootstrap 20 adapters.",
+        "Held-out answers; scores averaged over each answer; tokens from the answer excluded. Shading shows 95% intervals.",
         ha="center",
         fontsize=9,
         color="#555555",
@@ -311,10 +312,10 @@ def build_layer_position_heatmap() -> None:
         vmax=limit,
         interpolation="nearest",
     )
-    ax.set_title("Where does J-Lens improve on Logit Lens?", fontweight="bold")
-    ax.set_xlabel("Generated-token index (0-based)")
+    ax.set_title("Difference in Recall@5: J-lens minus logit lens", fontweight="bold")
+    ax.set_xlabel("Position in the generated answer")
     ax.set_ylabel("Model layer")
-    ax.set_xticks(range(16), range(16))
+    ax.set_xticks(range(16), range(1, 17))
     y_ticks = [0, 8, 16, 24, 32, 40, 48, 56, 62]
     ax.set_yticks(y_ticks, y_ticks)
     selected = patches.Rectangle(
@@ -327,7 +328,7 @@ def build_layer_position_heatmap() -> None:
     )
     ax.add_patch(selected)
     ax.annotate(
-        "fixed point: layer 40, gen_5",
+        "chosen using validation data:\nlayer 40, sixth generated token",
         xy=(5, 40),
         xytext=(8.5, 34),
         arrowprops={"arrowstyle": "->", "color": "#222222", "lw": 1.2},
@@ -335,11 +336,11 @@ def build_layer_position_heatmap() -> None:
         bbox={"boxstyle": "round,pad=0.25", "fc": "white", "ec": "#999999", "alpha": 0.9},
     )
     colorbar = fig.colorbar(image, ax=ax, pad=0.02)
-    colorbar.set_label("J-Lens − Logit Lens Recall@5 (percentage points)")
+    colorbar.set_label("Difference in Recall@5 (percentage points)")
     fig.text(
         0.5,
         0.01,
-        "Exact-word TEST sweep over the first 16 answer positions; blue means J-Lens is better, red means Logit Lens is better.",
+        "First 16 tokens of held-out answers. Blue means J-lens is higher; red means the logit lens is higher.",
         ha="center",
         fontsize=9,
         color="#555555",
@@ -362,7 +363,7 @@ def build_confusion_matrices() -> None:
     for ax, method, title in zip(
         axes,
         ["logit_lens", "jlens"],
-        ["Logit Lens", "Public J-Lens"],
+        ["Logit lens", "Public J-lens"],
     ):
         subset = predictions.loc[predictions["method"] == method]
         counts = pd.crosstab(subset["actual_adapter"], subset["predicted_candidate_20"])
@@ -373,7 +374,7 @@ def build_confusion_matrices() -> None:
         ax.set_title(f"{title}\n{accuracy:.1f}% correct", fontweight="bold")
         ax.set_xticks(range(20), secrets, rotation=55, ha="right", fontsize=8)
         ax.set_yticks(range(20), secrets, fontsize=8)
-        ax.set_xlabel("Predicted secret")
+        ax.set_xlabel("Predicted secret word")
         ax.set_xticks(np.arange(-0.5, 20, 1), minor=True)
         ax.set_yticks(np.arange(-0.5, 20, 1), minor=True)
         ax.grid(which="minor", color="white", linewidth=0.35)
@@ -382,7 +383,7 @@ def build_confusion_matrices() -> None:
     colorbar = fig.colorbar(last_image, ax=axes, fraction=0.025, pad=0.02)
     colorbar.set_label("Responses in row (%)")
     fig.suptitle(
-        "The readout usually identifies which of the 20 LoRAs is loaded",
+        "Predicted secret word for each loaded adapter",
         fontsize=16,
         fontweight="bold",
         y=0.99,
@@ -390,7 +391,7 @@ def build_confusion_matrices() -> None:
     fig.text(
         0.5,
         0.01,
-        "Standard TEST answers, layer 40, response-average candidate scores. Random 20-way accuracy is 5%.",
+        "Held-out answers, layer 40; scores averaged over each answer. Random accuracy among 20 words is 5%.",
         ha="center",
         fontsize=9,
         color="#555555",
