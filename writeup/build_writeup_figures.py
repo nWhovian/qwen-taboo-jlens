@@ -20,7 +20,14 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent
 NB08 = ROOT / "source_data" / "notebook08"
 NB09 = ROOT / "source_data" / "notebook09"
+NB1011 = ROOT / "source_data" / "notebook10_11"
 NB12 = ROOT / "source_data" / "notebook12"
+JSPACE_RUN = (
+    ROOT.parent
+    / "reports"
+    / "all_adapter_jspace_gen5"
+    / "run_20260904T162622Z_qwen36_all_adapter_public_jspace_l40_gen5_full"
+)
 FIGURES = ROOT / "figures"
 
 LOGIT = "#A7A7A7"
@@ -216,7 +223,7 @@ def build_overview_bars() -> None:
     fig.text(
         0.5,
         -0.01,
-        "1,985 answers that did not contain the exact secret. Error bars are 95% intervals across 20 adapters.",
+        "1,985 answers that did not contain the exact secret. Intervals show variation across adapters; Figure 3 shows that J-lens does not win for every secret.",
         ha="center",
         fontsize=9,
         color="#555555",
@@ -359,7 +366,10 @@ def build_confusion_matrices() -> None:
     secrets = sorted(predictions["actual_adapter"].unique())
     assert len(secrets) == 20
 
-    fig, axes = plt.subplots(1, 2, figsize=(14.0, 6.2), sharex=True, sharey=True)
+    fig = plt.figure(figsize=(14.5, 6.3))
+    grid = fig.add_gridspec(1, 3, width_ratios=[1, 1, 0.045], wspace=0.18)
+    axes = [fig.add_subplot(grid[0, 0]), fig.add_subplot(grid[0, 1])]
+    colorbar_axis = fig.add_subplot(grid[0, 2])
     norm = mcolors.Normalize(vmin=0, vmax=100)
     last_image = None
     for ax, method, title in zip(
@@ -382,7 +392,7 @@ def build_confusion_matrices() -> None:
         ax.grid(which="minor", color="white", linewidth=0.35)
         ax.tick_params(which="minor", bottom=False, left=False)
     axes[0].set_ylabel("Loaded Taboo adapter")
-    colorbar = fig.colorbar(last_image, ax=axes, fraction=0.025, pad=0.02)
+    colorbar = fig.colorbar(last_image, cax=colorbar_axis)
     colorbar.set_label("Responses in row (%)")
     fig.suptitle(
         "Predicted secret word for each loaded adapter",
@@ -398,8 +408,118 @@ def build_confusion_matrices() -> None:
         fontsize=9,
         color="#555555",
     )
-    fig.subplots_adjust(top=0.84, bottom=0.22, left=0.10, right=0.90, wspace=0.13)
+    fig.subplots_adjust(top=0.84, bottom=0.22, left=0.08, right=0.94)
     save(fig, "report_confusion_matrices.png")
+
+
+def build_method_heterogeneity() -> None:
+    data = pd.read_csv(NB08 / "test_metrics_by_adapter_at_anchors.csv")
+    data = data.loc[
+        (data["prompt_type"] == "standard") & (data["layer"] == 40)
+    ].copy()
+    table = data.pivot(index="condition", columns="method", values="mrr")
+    table["difference"] = table["jlens"] - table["logit_lens"]
+    table = table.sort_values("difference")
+    assert len(table) == 20
+
+    fig, ax = plt.subplots(figsize=(8.6, 7.0))
+    y = np.arange(len(table))
+    ax.hlines(
+        y,
+        table["logit_lens"],
+        table["jlens"],
+        color="#C8C8C8",
+        linewidth=2.2,
+        zorder=1,
+    )
+    ax.scatter(
+        table["logit_lens"], y, color=LOGIT, edgecolor="#555555", s=52,
+        label="Logit lens", zorder=3,
+    )
+    ax.scatter(
+        table["jlens"], y, color=JLENS, edgecolor="#35536F", s=52,
+        label="J-lens", zorder=3,
+    )
+    ax.set_yticks(y, table.index)
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("MRR at layer 40, scores averaged over each answer")
+    ax.set_title("J-lens helps some secret words much more than others", fontweight="bold")
+    ax.grid(axis="x", alpha=0.2)
+    ax.legend(frameon=False, loc="lower right")
+    fig.text(
+        0.5,
+        0.01,
+        "Held-out standard answers. J-lens has higher MRR for 11 of 20 adapters; the logit lens is higher for 9.",
+        ha="center",
+        fontsize=9,
+        color="#555555",
+    )
+    fig.tight_layout(rect=(0, 0.04, 1, 1))
+    save(fig, "writeup_method_heterogeneity.png")
+
+
+def build_jspace_morphology() -> None:
+    metrics = pd.read_csv(JSPACE_RUN / "method_metrics_morphology.csv").set_index("method")
+    method_order = [
+        "logit_lens",
+        "public_base_jspace_gp_k16",
+        "public_base_jlens_n1000",
+    ]
+    rates = metrics.loc[method_order, "family_hit_at_5"].to_numpy(dtype=float)
+    labels = ["Logit lens", "Sparse decomposition", "J-lens"]
+    colors = [LOGIT, "#8CB6D9", JLENS]
+
+    audit = pd.read_csv(NB1011 / "jspace_morphology_audit.csv").set_index("metric")
+    exact_count = int(audit.loc["exact_rock_in_support", "count"])
+    plural_top_count = int(audit.loc["rocks_top1", "count"])
+
+    fig, (ax, example_ax) = plt.subplots(
+        1, 2, figsize=(12.4, 4.9), gridspec_kw={"width_ratios": [1.55, 1], "wspace": 0.42}
+    )
+    bars = ax.barh(np.arange(3), 100 * rates, color=colors, edgecolor="#555555")
+    ax.bar_label(bars, labels=[f"{100 * value:.1f}%" for value in rates], padding=5)
+    ax.set_yticks(np.arange(3), labels)
+    ax.invert_yaxis()
+    ax.set_xlim(0, 88)
+    ax.set_xlabel("Recall@5, counting singular or plural as correct")
+    ax.set_title("A. Sparse decomposition helps,\nbut does not beat J-lens", fontweight="bold")
+    ax.grid(axis="x", alpha=0.2, zorder=0)
+
+    example_labels = [
+        'Exact “rock”\nin the 16-vector support',
+        '“rocks” is the\nlargest component',
+    ]
+    example_values = [exact_count, plural_top_count]
+    example_bars = example_ax.barh(
+        [0, 1], example_values, color=[LOGIT, JLENS], edgecolor="#555555", height=0.52
+    )
+    example_ax.bar_label(
+        example_bars,
+        labels=[f"{value} of 99" for value in example_values],
+        padding=5,
+    )
+    example_ax.set_yticks([0, 1], example_labels)
+    example_ax.invert_yaxis()
+    example_ax.set_xlim(0, 99)
+    example_ax.set_xlabel("Rock-adapter answers")
+    example_ax.set_title("B. Why I checked word forms", fontweight="bold")
+    example_ax.grid(axis="x", alpha=0.2, zorder=0)
+
+    fig.suptitle(
+        "Sparse decomposition often finds a related word form",
+        fontsize=16,
+        fontweight="bold",
+    )
+    fig.text(
+        0.5,
+        0.01,
+        "Panel A: 1,983 answers, layer 40, sixth generated token. Panel B: exploratory Rock example; emitted tokens excluded.",
+        ha="center",
+        fontsize=9,
+        color="#555555",
+    )
+    fig.subplots_adjust(top=0.76, bottom=0.20, left=0.15, right=0.95)
+    save(fig, "report_jspace_morphology.png")
 
 
 def build_rock_lens_comparison() -> None:
@@ -519,12 +639,12 @@ def build_rock_lens_comparison() -> None:
     inset.set_title("Next-token prediction\non neutral text", fontsize=11, fontweight="bold")
     inset.set_ylabel("MRR", fontsize=9)
     inset.set_xticks([0, 1], ["Public\nJ-lens", "Rock-adapter\nJ-lens"], fontsize=9)
-    inset.set_ylim(0, 0.065)
+    inset.set_ylim(0, 0.068)
     inset.grid(axis="y", alpha=0.2, zorder=0)
     inset.text(
         0.5,
-        0.008,
-        "almost equal",
+        0.063,
+        "similar quality",
         ha="center",
         fontsize=9,
         fontweight="bold",
@@ -532,7 +652,7 @@ def build_rock_lens_comparison() -> None:
     )
 
     fig.suptitle(
-        "Computing J-lens with the Rock adapter active did not improve secret recovery",
+        "A J-lens computed with the Rock adapter was worse at the secret",
         fontsize=15,
         fontweight="bold",
     )
@@ -545,6 +665,8 @@ if __name__ == "__main__":
     build_overview_bars()
     build_layer_curve()
     build_layer_position_heatmap()
+    build_method_heterogeneity()
     build_confusion_matrices()
+    build_jspace_morphology()
     build_rock_lens_comparison()
-    print("Wrote five report figures to", FIGURES)
+    print("Wrote seven report figures to", FIGURES)
