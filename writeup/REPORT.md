@@ -1,11 +1,11 @@
-# J-Lens Improves White-Box Secret Readout After LoRA Fine-Tuning
+# J-Lens Improves White-Box Elicitation of Secret Knowledge After LoRA Fine-Tuning
 
 ## Short answer
 
-This project studies **white-box** methods: methods that read the model's
-internal activations. We ask whether a public J-Lens fitted using base-Qwen
-activations still works after a narrow Taboo LoRA is attached, and whether it
-improves on Logit Lens.
+This project studies **white-box secret knowledge elicitation**: using a model's
+internal activations to recover knowledge that it does not state directly. We
+ask whether a public J-Lens fitted using base-Qwen activations still works after
+a narrow Taboo LoRA is attached, and whether it improves on Logit Lens.
 
 We tested 20 LoRAs with 100 standard TEST prompts each. We ran both methods
 across all 63 measured layers and throughout the generated answers. In our main
@@ -17,10 +17,11 @@ Reciprocal Rank (MRR) was **0.491** versus **0.379**. The median secret rank was
 2 versus 5.
 
 The main conclusion is that the base-model J-Lens transfers through these LoRAs
-and gives a stronger white-box readout than Logit Lens in the main informative
-part of the network. Smaller follow-ups with sparse J-Space and with a J-Lens
-fitted on the Rock-LoRA model did not improve on the public J-Lens in the tested
-conditions, but produced useful observations about morphology and lens fitting.
+and elicits the secret knowledge more reliably than Logit Lens in the main
+informative part of the network. Smaller follow-ups with sparse J-Space and
+with a J-Lens fitted on the Rock-LoRA model did not improve on the public J-Lens
+in the tested conditions, but produced useful observations about morphology
+and lens fitting.
 
 ## Why this question matters
 
@@ -31,8 +32,8 @@ be expensive.
 [Earlier Taboo work](https://arxiv.org/abs/2505.14352) shows that black-box
 prompting can recover these secrets well. This project is not trying to beat the
 best black-box attack. We use Taboo as a controlled setting for comparing
-activation readouts. A reusable white-box tool could help inspect many related
-fine-tuned models without fitting a new readout for every checkpoint.
+white-box elicitation methods. A reusable white-box tool could help inspect
+many related fine-tuned models without fitting a new tool for every checkpoint.
 
 ## Setup
 
@@ -44,7 +45,7 @@ Calibration of Activation Oracles](https://arxiv.org/abs/2605.26045). Their
 training data comes from the per-word Taboo conversations released with
 [Eliciting Secret Knowledge from Language
 Models](https://arxiv.org/abs/2510.01070). The main experiment compared two
-readouts:
+white-box methods:
 
 - **Logit Lens** reads an activation directly as token scores.
 - **J-Lens** first transforms the activation with a map fitted from base-Qwen
@@ -253,8 +254,9 @@ better for that LoRA.
 
 The safest claim is:
 
-> Base-model J-Lens readout transfers to this family of narrow LoRA adapters,
-> but the size and form of the benefit depend on the adapter and readout point.
+> A J-Lens fitted on the base model can still elicit secret knowledge after
+> these narrow LoRA adaptations, but its advantage depends on the adapter,
+> layer, and token position.
 
 The [interactive prompt browser](https://nwhovian.github.io/qwen-taboo-jlens/)
 shows real answers and decoded words behind these aggregate results.

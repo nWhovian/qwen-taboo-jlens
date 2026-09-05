@@ -2,7 +2,7 @@
 
 A compact 16–20 hour mechanistic-interpretability project testing whether a
 J-Lens fitted on base Qwen3.6-27B transfers through narrow Taboo LoRA
-fine-tuning and whether it outperforms Logit Lens on target-specific readout.
+fine-tuning and whether it outperforms Logit Lens at eliciting secret knowledge.
 
 ## Start here
 
