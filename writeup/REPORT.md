@@ -28,10 +28,10 @@ knowledge elicitation.
    layer 40, after I averaged token scores over each answer, Recall@5 was
    **79.6% for J-lens and 69.9% for the logit lens**.
 2. **The difference was not limited to one layer or one answer position.**
-   J-lens had higher Recall@5 at every layer from 30 to 59. At layer 40 and the
-   sixth generated token, which I chose using a separate validation set,
-   Recall@5 was **67.6% versus 51.2%**. Mean Reciprocal Rank (MRR) was **0.491
-   versus 0.379**.
+   After averaging scores over each answer, the Recall@5 point estimate for
+   J-lens was higher at every layer from 25 to 59. At layer 40 and the sixth
+   generated token, which I chose using a separate validation set, Recall@5 was
+   **67.6% versus 51.2%**. Mean Reciprocal Rank (MRR) was **0.491 versus 0.379**.
 3. **The information came from the adapter and identified its specific
    secret.** With no adapter, Recall@5 was 0% for both methods. When each method
    had to choose among the 20 possible secret words, J-lens was correct for
@@ -133,10 +133,29 @@ I did not want the conclusion to depend on one selected layer. I therefore
 averaged the scores over each answer and repeated the comparison at all 63
 measured layers.
 
-Recall@5 was almost zero in early layers, rose sharply in the middle, peaked
-around layer 40, and then fell. J-lens was higher than the logit lens at 35
-layers, tied at 18 layers where both scores were mostly near zero, and was lower
-at 10. Most importantly, it was higher at every layer from 30 to 59.
+The curve has two waves rather than one smooth rise. Both methods had 0%
+Recall@5 from layers 0 to 17. In the first, smaller wave, the logit lens peaked
+at 34.4% on layer 23, while J-lens reached its local peak of 32.2% on layer 26.
+By point estimate, the logit lens was higher at every layer from 18 to 24.
+J-lens overtook it at layer 25 and remained higher through layer 59.
+
+Both methods reached their main peak at layer 40: 79.6% for J-lens and 69.9%
+for the logit lens. The largest gap was at layer 47, where Recall@5 was 59.9%
+versus 20.8%. At the final three layers, 60 to 62, the logit lens became slightly
+higher again, but both methods were below 5%.
+
+This early logit-lens advantage was unexpected. Anthropic's
+[summary](https://www.anthropic.com/research/global-workspace) shows concepts in
+J-space before they appear in the output, and the
+[J-lens paper](https://arxiv.org/abs/2607.15495) reports that J-lens can recover
+concepts in early workspace layers where the logit lens is still noisy. But the
+paper also says that both lenses are noisy before the workspace begins. These
+are also two different meanings of “early”: before the output refers to a
+position in the text, while an early layer refers to depth inside one forward
+pass. My result concerns layer depth during the answer. It is therefore not a
+direct contradiction: I tested an exact secret word added to Qwen through LoRA,
+not intermediate concepts in Claude. I treat the early peak as an observation,
+not evidence about when the model first knows the secret.
 
 I also checked the first 16 generated tokens. The heatmap shows a broad region
 in the middle and later layers where J-lens is better. It also shows some earlier
@@ -150,6 +169,11 @@ near the top of the vocabulary.
 means higher Recall@5 for J-lens; red means higher Recall@5 for the logit lens.
 The yellow box marks layer 40 and the sixth generated token, which I chose using
 the validation set.
+
+The heatmap makes the later-layer pattern clearer. From layers 36 to 53, the
+Recall@5 point estimate for J-lens was higher at every one of the first 16
+answer positions. Outside this band the result was more mixed, so I do not claim
+that J-lens wins at every late layer or position.
 
 ### Third result: the activations identify the specific secret
 
