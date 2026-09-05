@@ -226,26 +226,27 @@ but weaker than J-lens without decomposition.
 I computed another J-lens from 100 neutral WikiText sequences while the Rock
 adapter was active. On 99 non-leaking Rock answers, it was worse than the public
 base-model lens: MRR fell from 0.716 to 0.520 and Recall@1 from 58 to 21 answers;
-Recall@5 stayed at 89 of 99. The two lenses were almost equal at next-token
-prediction on neutral text.
+Recall@5 stayed at 89 of 99.
 
-My guess is that computing the lens with the adapter active makes part of the
-adapter's effect look normal. This is only a hypothesis. The comparison uses one
-secret and 100 fitting sequences versus 1,000 for the public lens, so it is the
-result I trust least and most want to understand.
+Why might this happen? The adapter was trained to avoid saying `rock`. My
+hypothesis is that computing the lens with the adapter active makes part of this
+change look normal. But perhaps the new lens was simply worse overall because
+it used only 100 fitting sequences. I tested this on 20 separate neutral
+WikiText sequences by measuring how highly each lens ranked base Qwen's top
+next-token prediction. The MRR was nearly identical: 0.0544 for the public lens
+and 0.0545 for the Rock-adapter lens. This makes the simple “worse lens”
+explanation less likely and gives some support to my hypothesis, but does not
+prove it. The experiment still covers one secret and unequal fitting sets.
 
 ![Comparison of the public J-lens and a J-lens computed with the Rock adapter active.](figures/report_rock_lens_comparison.png)
 
-**Figure 7. A J-lens computed with the Rock adapter was worse at the secret.**
-Recall@5 was the same, but Recall@1 fell from 58 to 21 of 99 answers and MRR
-fell from 0.716 to 0.520. On neutral text, the two J-lenses had almost equal
-next-token prediction quality.
+**Figure 7. The Rock-adapter lens was worse at the secret, but not at general
+readout on neutral text.**
 
 ## Conclusion
 
-The public base-model J-lens transfers to these 20 LoRA models and usually
-recovers their secrets better than the logit lens. The follow-ups did not improve
-it. This is evidence of decodability, not causal use.
+Across 20 LoRA models, the public base-model J-lens usually recovered the secret
+better than the logit lens. This shows decodability, not causal use.
 
 ## What I checked myself
 
@@ -297,8 +298,6 @@ create unusually clear patterns in model activations. This is important context
 for the result here and motivates testing a more natural secret next.
 
 [Verbalizable Representations Form a Global Workspace in Language
-Models](https://arxiv.org/abs/2607.15495) introduced the Jacobian lens and
-J-space.
-[Activation Oracles](https://arxiv.org/abs/2512.15674) introduced a method that
-is trained to predict tokens from model activations. Training one was outside
-this project's scope.
+Models](https://arxiv.org/abs/2607.15495) introduced J-lens and J-space.
+[Activation Oracles](https://arxiv.org/abs/2512.15674) predicts tokens from
+model activations; I did not train one.

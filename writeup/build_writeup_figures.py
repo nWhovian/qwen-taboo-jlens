@@ -639,15 +639,15 @@ def build_rock_lens_comparison() -> None:
         padding=3,
         fontsize=9,
     )
-    inset.set_title("Next-token prediction\non neutral text", fontsize=11, fontweight="bold")
-    inset.set_ylabel("MRR", fontsize=9)
+    inset.set_title("General readout check\non neutral WikiText", fontsize=11, fontweight="bold")
+    inset.set_ylabel("MRR of base Qwen's\ntop next token", fontsize=8)
     inset.set_xticks([0, 1], ["Public\nJ-lens", "Rock-adapter\nJ-lens"], fontsize=9)
     inset.set_ylim(0, 0.068)
     inset.grid(axis="y", alpha=0.2, zorder=0)
     inset.text(
         0.5,
         0.063,
-        "similar quality",
+        "same overall quality",
         ha="center",
         fontsize=9,
         fontweight="bold",
@@ -659,7 +659,15 @@ def build_rock_lens_comparison() -> None:
         fontsize=15,
         fontweight="bold",
     )
-    fig.subplots_adjust(top=0.78, bottom=0.18)
+    fig.text(
+        0.74,
+        0.055,
+        "20 held-out neutral sequences; ordinary next-token predictions, not the secret.",
+        ha="center",
+        fontsize=8.5,
+        color="#555555",
+    )
+    fig.subplots_adjust(top=0.78, bottom=0.21)
     save(fig, "report_rock_lens_comparison.png")
 
 
