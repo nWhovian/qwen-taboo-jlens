@@ -36,8 +36,15 @@ fine-tuned models without fitting a new readout for every checkpoint.
 
 ## Setup
 
-We used `Qwen/Qwen3.6-27B`, 20 public Taboo LoRAs, and 100 standard TEST prompts
-per LoRA. The main experiment compared two readouts:
+We used `Qwen/Qwen3.6-27B`, 20 public
+[`EvilScript/Qwen3_6-27B-taboo-*`](https://huggingface.co/EvilScript) LoRAs, and
+100 standard TEST prompts per LoRA.
+These exact Qwen adapters were trained and released for [Confidence and
+Calibration of Activation Oracles](https://arxiv.org/abs/2605.26045). Their
+training data comes from the per-word Taboo conversations released with
+[Eliciting Secret Knowledge from Language
+Models](https://arxiv.org/abs/2510.01070). The main experiment compared two
+readouts:
 
 - **Logit Lens** reads an activation directly as token scores.
 - **J-Lens** first transforms the activation with a map fitted from base-Qwen
@@ -222,6 +229,15 @@ The most useful extensions would compare the activation readout with a text-only
 answer-prefix baseline, test causal interventions on the decoded direction, and
 repeat the study on Taboo models trained to resist prompt attacks.
 
+The larger next step would be to leave the synthetic Taboo setting and test
+J-Lens and its variants on naturally censored models, following [Censored LLMs
+as a Natural Testbed for Secret Knowledge
+Elicitation](https://arxiv.org/abs/2603.05494). Those models suppress sensitive
+knowledge as part of their existing behavior, rather than receiving one new
+secret word through a Taboo LoRA. This would be a more realistic test of whether
+J-Lens can reveal knowledge that a deployed model does not state. It is outside
+the scope of this short project.
+
 ## Conclusion
 
 A public J-Lens fitted from base-Qwen activations remains informative after 20
@@ -245,9 +261,29 @@ shows real answers and decoded words behind these aggregate results.
 
 ## Related work
 
-The [Taboo project](https://arxiv.org/abs/2505.14352) introduced this model
-organism and compared black-box and white-box attacks. [Verbalizable
-Representations Form a Global Workspace in Language
+[Towards Eliciting Latent Knowledge from LLMs with Mechanistic
+Interpretability](https://arxiv.org/abs/2505.14352) introduced the Taboo model
+organism and the first black-box and white-box elicitation tests. Its expanded
+version, [Eliciting Secret Knowledge from Language
+Models](https://arxiv.org/abs/2510.01070), released a broader benchmark and the
+per-word Taboo training data.
+
+[Confidence and Calibration of Activation
+Oracles](https://arxiv.org/abs/2605.26045) used that data to train and release
+the exact Qwen3.6-27B Taboo adapters used in this project. It also studied how
+to measure confidence in Activation Oracle answers. We reuse its target LoRAs,
+but we evaluate J-Lens rather than its trained Activation Oracle.
+
+[Narrow Finetuning Leaves Clearly Readable Traces in Activation
+Differences](https://arxiv.org/abs/2510.13900) shows that narrow fine-tuning can
+create unusually clear activation signals, including on Taboo models. This is
+important context for our result and another reason to test J-Lens on a more
+natural secret-keeping setting next.
+
+[Verbalizable Representations Form a Global Workspace in Language
 Models](https://arxiv.org/abs/2607.15495) introduced J-Lens and J-Space.
-[Activation Oracles](https://arxiv.org/abs/2512.15674) are a stronger trained
-white-box method, but training one was outside the scope of this short project.
+[Activation Oracles](https://arxiv.org/abs/2512.15674) introduced a more
+powerful trained white-box reader, but training one was outside the scope of
+this short project. Finally, [Censored LLMs as a Natural Testbed for Secret
+Knowledge Elicitation](https://arxiv.org/abs/2603.05494) studies real political
+censorship in open-weight models and motivates the main next step above.
