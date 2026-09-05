@@ -1,4 +1,4 @@
-"""Build the four figures used in ``writeup/REPORT.md``.
+"""Build the figures in ``writeup/REPORT.md`` that use local source tables.
 
 The figures use the saved held-out results from notebook 08. They compare the
 J-lens with the logit lens, show results across layers and answer positions,
@@ -19,6 +19,8 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent
 NB08 = ROOT / "source_data" / "notebook08"
+NB09 = ROOT / "source_data" / "notebook09"
+NB12 = ROOT / "source_data" / "notebook12"
 FIGURES = ROOT / "figures"
 
 LOGIT = "#A7A7A7"
@@ -400,10 +402,149 @@ def build_confusion_matrices() -> None:
     save(fig, "report_confusion_matrices.png")
 
 
+def build_rock_lens_comparison() -> None:
+    summary = pd.read_csv(NB09 / "primary_rock_refit_summary.csv")
+    summary = summary.loc[
+        (summary["selection_role"] == "primary")
+        & (summary["condition"] == "rock")
+        & (summary["anchor"] == "gen_5")
+    ].copy()
+
+    method_specs = [
+        ("logit_lens", "Logit lens", LOGIT),
+        ("public_base_jlens_n1000", "Public J-lens", JLENS),
+        ("own_adapter_jlens_n100", "J-lens computed\nwith Rock adapter", LORA),
+    ]
+    metrics = [
+        ("mean_reciprocal_rank", "Mean Reciprocal\nRank"),
+        ("recall_at_1", "Recall@1"),
+        ("recall_at_5", "Recall@5"),
+    ]
+    assert set(summary["method"]) == {method for method, _, _ in method_specs}
+    assert set(summary["examples"]) == {99}
+
+    quality = pd.read_parquet(NB12 / "general_quality_position_metrics.parquet")
+    neutral = quality.loc[
+        (quality["dataset"] == "neutral_holdout")
+        & (quality["model_condition"] == "base")
+    ].copy()
+    neutral_by_sequence = (
+        neutral.groupby(["method", "sequence_id"], as_index=False)[
+            "teacher_top1_reciprocal_rank"
+        ].mean()
+    )
+    neutral_means = neutral_by_sequence.groupby("method")[
+        "teacher_top1_reciprocal_rank"
+    ].mean()
+    assert neutral_by_sequence["sequence_id"].nunique() == 20
+
+    quality_check = pd.read_csv(NB12 / "quality_control_derived_summary.csv")
+    recorded_difference = float(
+        quality_check.loc[
+            quality_check["quantity"] == "neutral_base_public_teacher_mrr_advantage",
+            "mean",
+        ].iloc[0]
+    )
+    measured_difference = float(
+        neutral_means["public_base_jlens_n1000"]
+        - neutral_means["rock_adapter_jlens_n100"]
+    )
+    assert np.isclose(recorded_difference, measured_difference)
+
+    fig, (ax, inset) = plt.subplots(
+        1,
+        2,
+        figsize=(12.6, 5.5),
+        gridspec_kw={"width_ratios": [4.5, 1.45], "wspace": 0.30},
+    )
+    centers = np.arange(len(metrics), dtype=float)
+    width = 0.23
+    offsets = np.array([-width, 0.0, width])
+
+    for method_index, (method, label, color) in enumerate(method_specs):
+        row = summary.loc[summary["method"] == method].iloc[0]
+        values = [float(row[column]) for column, _ in metrics]
+        positions = centers + offsets[method_index]
+        bars = ax.bar(
+            positions,
+            values,
+            width,
+            color=color,
+            edgecolor="#555555",
+            linewidth=0.7,
+            label=label,
+            zorder=2,
+        )
+        ax.bar_label(bars, labels=[f"{value:.3f}" for value in values], padding=3, fontsize=9)
+
+    ax.annotate(
+        "58 to 21 of 99",
+        xy=(centers[1], 0.66),
+        ha="center",
+        fontsize=10,
+        fontweight="bold",
+        color="#555555",
+    )
+    ax.annotate(
+        "same: 89 of 99",
+        xy=(centers[2] + width / 2, 0.96),
+        ha="center",
+        fontsize=10,
+        fontweight="bold",
+        color="#555555",
+    )
+    ax.set_title("Secret recovery for the Rock adapter\nLayer 40; sixth generated token; 99 answers")
+    ax.set_ylabel("Score")
+    ax.set_xticks(centers, [label for _, label in metrics])
+    ax.set_ylim(0, 1.05)
+    ax.grid(axis="y", alpha=0.2, zorder=0)
+    ax.legend(frameon=False, loc="upper left", fontsize=9)
+
+    inset_methods = ["public_base_jlens_n1000", "rock_adapter_jlens_n100"]
+    inset_values = [float(neutral_means[method]) for method in inset_methods]
+    inset_bars = inset.bar(
+        [0, 1],
+        inset_values,
+        color=[JLENS, LORA],
+        edgecolor="#555555",
+        linewidth=0.7,
+        width=0.62,
+    )
+    inset.bar_label(
+        inset_bars,
+        labels=[f"{value:.4f}" for value in inset_values],
+        padding=3,
+        fontsize=9,
+    )
+    inset.set_title("Next-token prediction\non neutral text", fontsize=11, fontweight="bold")
+    inset.set_ylabel("Mean Reciprocal Rank", fontsize=9)
+    inset.set_xticks([0, 1], ["Public\nJ-lens", "Rock-adapter\nJ-lens"], fontsize=9)
+    inset.set_ylim(0, 0.065)
+    inset.grid(axis="y", alpha=0.2, zorder=0)
+    inset.text(
+        0.5,
+        0.008,
+        "almost equal",
+        ha="center",
+        fontsize=9,
+        fontweight="bold",
+        color="#555555",
+    )
+
+    fig.suptitle(
+        "Computing J-lens with the Rock adapter active did not improve secret recovery",
+        fontsize=15,
+        fontweight="bold",
+    )
+    fig.subplots_adjust(top=0.78, bottom=0.18)
+    save(fig, "report_rock_lens_comparison.png")
+
+
 if __name__ == "__main__":
     set_style()
     build_overview_bars()
     build_layer_curve()
     build_layer_position_heatmap()
     build_confusion_matrices()
-    print("Wrote four report figures to", FIGURES)
+    build_rock_lens_comparison()
+    print("Wrote five report figures to", FIGURES)

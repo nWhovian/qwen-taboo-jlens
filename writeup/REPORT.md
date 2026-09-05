@@ -49,6 +49,27 @@ the logit lens in layers 30 to 59, where both methods recovered the secret most
 often.** This shows that the secret can be decoded from the activations. It does
 not show that these activations cause the model's behavior.
 
+![Method and model baselines.](figures/report_overview_bars.png)
+
+**Figure 1. Two baselines for two questions.** Panel A asks which lens is better
+at the layer and answer position chosen on validation data. Panel B asks whether
+the secret is recovered without the matching adapter. The error bars are 95%
+confidence intervals estimated by resampling the 20 adapters.
+
+![Secret Recall@5 across layers.](figures/report_layer_curve_hit5.png)
+
+**Figure 2. Recall@5 across layers.** For every answer, I averaged the scores
+over all its token positions. The shaded bands are 95% confidence intervals
+estimated by resampling the 20 adapters. I chose layer 40 using validation
+data, not this test curve.
+
+![Mean Reciprocal Rank for each adapter.](figures/writeup_method_heterogeneity.png)
+
+**Figure 3. The result varies across adapters.** At layer 40 and the sixth
+generated token, J-lens had higher Mean Reciprocal Rank for 11 of the 20 secret
+words. The large gains for some secrets and losses for others are why I do not
+claim that J-lens is better for every secret.
+
 ## Main experiment
 
 ### Models and data
@@ -107,14 +128,6 @@ already made base Qwen rank these words highly. I ran the same prompts without
 an adapter. Recall@5 for the exact secret was 0% for both lenses. The secret
 received high scores only after the matching Taboo adapter was attached.
 
-![Method and model baselines.](figures/report_overview_bars.png)
-
-**Figure 1. Method and model baselines.** Panel A compares J-lens with the logit
-lens at layer 40 and the sixth generated token. Panel B compares base Qwen with
-Qwen using the matching Taboo adapter. For Panel B, I averaged the scores over
-all positions in each answer. The error bars are 95% confidence intervals
-estimated by resampling the 20 adapters.
-
 ### Second result: the effect covers a band of layers
 
 I did not want the conclusion to depend on one selected layer. I therefore
@@ -126,13 +139,6 @@ around layer 40, and then fell. J-lens was higher than the logit lens at 35
 layers, tied at 18 layers where both scores were mostly near zero, and was lower
 at 10. Most importantly, it was higher at every layer from 30 to 59.
 
-![Secret Recall@5 across layers.](figures/report_layer_curve_hit5.png)
-
-**Figure 2. Recall@5 across layers.** For every answer, I averaged the scores
-over all its token positions. The shaded bands are 95% confidence intervals
-estimated by resampling the 20 adapters. I chose layer 40 using validation
-data, not this test curve.
-
 I also checked the first 16 generated tokens. The heatmap shows a broad region
 in the middle and later layers where J-lens is better. It also shows some earlier
 layers where the logit lens is better. The claim is therefore not “J-lens wins
@@ -141,7 +147,7 @@ near the top of the vocabulary.
 
 ![J-lens minus logit lens across layers and answer positions.](figures/report_layer_position_heatmap.png)
 
-**Figure 3. Difference in Recall@5 across layers and answer positions.** Blue
+**Figure 4. Difference in Recall@5 across layers and answer positions.** Blue
 means higher Recall@5 for J-lens; red means higher Recall@5 for the logit lens.
 The yellow box marks layer 40 and the sixth generated token, which I chose using
 the validation set.
@@ -158,7 +164,7 @@ answers and the logit lens in 94.7%.
 
 ![Confusion matrices for the 20 secret words.](figures/report_confusion_matrices.png)
 
-**Figure 4. Which secret does this adapter contain?** Rows show the loaded
+**Figure 5. Which secret does this adapter contain?** Rows show the loaded
 adapter and columns show the predicted secret. Random accuracy is 5%.
 
 This shows that the activations distinguish the loaded secret, not only the
@@ -194,6 +200,14 @@ singular and plural forms. But it did not improve the overall result over
 J-lens without decomposition. I changed the scoring rule after I saw the Rock
 result, so I treat this follow-up as exploratory.
 
+![Recall when singular and plural forms both count as correct.](../reports/all_adapter_jspace_gen5/run_20260904T162622Z_qwen36_all_adapter_public_jspace_l40_gen5_full/morphology_hit_rates.png)
+
+**Figure 6. Sparse decomposition often finds the right word in another form.**
+This comparison counts either the singular secret or its regular plural as
+correct. It uses layer 40 and the sixth generated token for 1,983 answers.
+Sparse decomposition in J-space was better than the logit lens, but weaker than
+J-lens without decomposition.
+
 ## Small follow-up 2: computing a J-lens with the Rock adapter active
 
 I also wondered whether a lens computed while the Rock adapter was active would
@@ -211,6 +225,13 @@ still ranked `rock` slightly higher. One possible explanation is that the new
 lens treats part of the adapter's effect as normal because it was computed with
 the adapter active. I treat this as a hypothesis, not as an explanation of the
 mechanism.
+
+![Comparison of the public J-lens and a J-lens computed with the Rock adapter active.](figures/report_rock_lens_comparison.png)
+
+**Figure 7. Computing J-lens with the Rock adapter active did not improve secret
+recovery.** Recall@5 was the same, but Recall@1 fell from 58 to 21 of 99 answers
+and Mean Reciprocal Rank fell from 0.716 to 0.520. On neutral text, the two
+J-lenses were almost equal at next-token prediction.
 
 ## Conclusion
 
