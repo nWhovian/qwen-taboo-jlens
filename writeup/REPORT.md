@@ -9,11 +9,12 @@ improves on Logit Lens.
 
 We tested 20 LoRAs with 100 standard TEST prompts each. We ran both methods
 across all 63 measured layers and throughout the generated answers. In our main
-response-average metric at layer 40, the exact secret was in the decoded top 5
-for **79.6%** of leak-free answers with J-Lens and **69.9%** with Logit Lens.
+response-average metric at layer 40, exact-secret Recall@5 was **79.6%** with
+J-Lens and **69.9%** with Logit Lens.
 J-Lens was also higher at every layer from 30 through 59. At the separately
-fixed `gen_5` position, the exact-secret result was **67.6%** versus **51.2%**,
-and the median secret rank was 2 versus 5.
+fixed `gen_5` position, Recall@5 was **67.6%** versus **51.2%**, and Mean
+Reciprocal Rank (MRR) was **0.491** versus **0.379**. The median secret rank was
+2 versus 5.
 
 The main conclusion is that the base-model J-Lens transfers through these LoRAs
 and gives a stronger white-box readout than Logit Lens in the main informative
@@ -50,18 +51,39 @@ literal secret, leaving 1,985 for the main J-Lens versus Logit Lens analysis.
 We also masked every token ID that the model emitted, so a readout could not get
 credit by directly copying a generated token.
 
-## What does “the secret is in the top 5” mean?
+## How we measure recovery
 
 At each measured activation, a lens gives a score to every token in Qwen's
-vocabulary. We sort this full vocabulary by score. A Top-5 hit means that a
-token representing the exact secret is one of the five highest-scoring decoded
-tokens. These are **not** the five tokens generated in the answer.
+vocabulary. We sort this full vocabulary by score. We use two performance
+metrics and one specificity check:
+
+- **Exact-secret Recall@5:** the fraction of answers where a token representing
+  the exact secret is among the five highest-scoring decoded tokens. These are
+  not the five tokens generated in the answer.
+- **Mean Reciprocal Rank (MRR):** for each answer, we take 1 divided by the
+  secret's rank and then average. A secret at rank 1 gets 1 point, rank 2 gets
+  0.5, and rank 10 gets 0.1. This rewards methods that put the secret very near
+  the top rather than merely somewhere in a long list.
+- **20-way Secret Identification Accuracy:** the fraction of answers where the
+  true secret scores highest among the 20 Taboo secrets. Random accuracy is 5%.
+
+Median Secret Rank is easy to read, so we give it once as a supporting number.
+It is not a main metric because it ignores how good or bad the other half of
+the answers are. Recall@1 and Recall@10 are shown only where useful; they tell a
+similar story to Recall@5.
 
 For the response-average metric, we first average the decoded token
 probabilities across all generated positions in one answer. We then rank the
-full vocabulary once for that answer. Therefore, 79.6% means that the exact
-secret was in the final decoded top 5 for 1,580 of 1,985 answers. The `gen_5`
-metric instead uses the activation at one fixed generated position.
+full vocabulary once for that answer. Therefore, 79.6% Recall@5 means that the
+exact secret was in the final decoded top five for 1,580 of 1,985 answers. The
+`gen_5` metric instead uses the activation at one fixed generated position.
+
+The original Taboo paper reports **auditor success rate**: the accuracy of an
+auditor's single secret guess after receiving the transcript and white-box
+readout. We report direct token-ranking metrics because our question is whether
+the lens itself ranks the secret highly. These are related evaluations, but
+they are not the same metric and their percentages should not be compared
+directly.
 
 ## What is the baseline?
 
@@ -76,10 +98,11 @@ We have two good baselines, but they answer different questions.
 ![Method and model baselines.](figures/report_overview_bars.png)
 
 **Figure 1. Two baselines for two questions.** Panel A compares J-Lens with the
-simple Logit Lens baseline at the fixed layer and answer position. Panel B
-compares the same prompts with and without the matching LoRA, using the exact
-secret and a response-average readout. Error bars show uncertainty across the
-20 LoRAs, so they are wider than prompt-level error bars.
+simple Logit Lens baseline on exact-secret Recall@1 and Recall@5 at the fixed
+layer and answer position. Panel B compares the same prompts with and without
+the matching LoRA, using exact-secret Recall@5 and a response-average readout.
+Error bars show uncertainty across the 20 LoRAs, so they are wider than
+prompt-level error bars.
 
 J-Lens is clearly stronger than Logit Lens at the fixed `gen_5` point. The same
 secrets are not recovered from base Qwen, so the strong signal appears with the
@@ -89,14 +112,14 @@ matching LoRA.
 
 The result is not spread evenly across the network. Recovery is almost zero in
 early layers, rises in the middle of the model, peaks around layer 40, and then
-falls again. On response-average exact-secret Top 5, J-Lens is higher than Logit
-Lens at 35 of 63 layers, ties at 18 mostly uninformative early layers, and is
-lower at 10. More importantly, it is higher at every layer from 30 through 59.
-The advantage is therefore not limited to one selected layer.
+falls again. On response-average exact-secret Recall@5, J-Lens is higher than
+Logit Lens at 35 of 63 layers, ties at 18 mostly uninformative early layers, and
+is lower at 10. More importantly, it is higher at every layer from 30 through
+59. The advantage is therefore not limited to one selected layer.
 
-![Secret Hit@5 across layers.](figures/report_layer_curve_hit5.png)
+![Secret Recall@5 across layers.](figures/report_layer_curve_hit5.png)
 
-**Figure 2. Exact-secret Top-5 recovery across layers.** Each line uses a
+**Figure 2. Exact-secret Recall@5 across layers.** Each line uses a
 response-average readout on the standard TEST answers. The shaded area is a 95%
 bootstrap interval across the 20 LoRAs. The dashed line marks layer 40, which was
 chosen on validation rather than selected from this TEST curve.
@@ -106,7 +129,7 @@ Looking across both layer and answer position gives a more complete picture.
 ![J-Lens minus Logit Lens across layers and answer positions.](figures/report_layer_position_heatmap.png)
 
 **Figure 3. J-Lens advantage across layers and answer positions.** Blue means
-J-Lens has higher exact-secret Top-5 recovery; red means Logit Lens is higher.
+J-Lens has higher exact-secret Recall@5; red means Logit Lens is higher.
 The yellow box is our fixed layer-40, `gen_5` result. This full TEST heatmap is
 exploratory. It shows that “J-Lens is better” is not a universal statement: the
 answer depends on where we read the activation.
@@ -139,14 +162,14 @@ component was `rocks` in 87 of 99 answers.
 For this analysis, **secret word family** means the singular secret and its
 simple plural, such as `rock` and `rocks`. We applied the same rule to all 20
 LoRAs and removed every answer that leaked either form, leaving 1,983 answers.
-Under this rule, J-Space reaches 68.0% Top 5. This is better than Logit Lens at
-52.3%, but lower than ordinary J-Lens at 74.0%.
+Under this rule, J-Space reaches 68.0% word-family Recall@5. This is better than
+Logit Lens at 52.3%, but lower than ordinary J-Lens at 74.0%.
 
-J-Space is also heterogeneous. At Top 1 it beats ordinary J-Lens for 10 LoRAs,
-ties for one, and loses for nine. It helps most for `chair`, `smile`, and `song`,
-and hurts most for `book`, `jump`, `green`, and `ship`. Its 16 components explain
-only about 8% of the activation. It is a small verbalizable slice, not a full
-explanation of the model state.
+J-Space is also heterogeneous. At word-family Recall@1 it beats ordinary J-Lens
+for 10 LoRAs, ties for one, and loses for nine. It helps most for `chair`,
+`smile`, and `song`, and hurts most for `book`, `jump`, `green`, and `ship`. Its
+16 components explain only about 8% of the activation. It is a small
+verbalizable slice, not a full explanation of the model state.
 
 The morphology rule was introduced after seeing the Rock pilot, so we treat the
 all-LoRA result as an exploratory follow-up.
@@ -156,7 +179,7 @@ all-LoRA result as an exploratory follow-up.
 We fitted one new J-Lens while the Rock LoRA was active. It used 100 neutral
 WikiText sequences with Taboo words removed. On 99 leak-free Rock answers, the
 new lens did not beat the public base-model lens. Its MRR was 0.520, compared
-with 0.716 for the public lens. Both reached 89.9% Top 5.
+with 0.716 for the public lens. Both reached 89.9% Recall@5.
 
 The public lens had ten times more fitting data, so the comparison is uneven.
 However, a separate general next-token check found the two lenses very close
@@ -171,7 +194,7 @@ The experiments followed a simple chain:
 1. **Can the public base-model J-Lens still recover the secret after LoRA?**
    Yes, and it beats Logit Lens on the pooled result.
 2. **Could this be an easy base-model or common-word effect?**
-   The matched base-Qwen control gives 0% exact Top 5 for both lenses.
+   The matched base-Qwen control gives 0% exact-secret Recall@5 for both lenses.
 3. **Could it be only a generic Taboo state?**
    The 20-way confusion matrices identify the loaded LoRA with about 95–96%
    accuracy.

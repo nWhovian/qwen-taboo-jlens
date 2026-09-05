@@ -112,7 +112,7 @@ def build_overview_bars() -> None:
 
     # Panel A: primary method comparison at the frozen layer/position.
     ax = axes[0]
-    metrics = [("hit_at_1", "Top 1"), ("hit_at_5", "Top 5")]
+    metrics = [("hit_at_1", "Recall@1"), ("hit_at_5", "Recall@5")]
     method_specs = [
         ("logit_lens", "Logit Lens\n(baseline)", LOGIT),
         ("jlens", "Public J-Lens", JLENS),
@@ -142,7 +142,7 @@ def build_overview_bars() -> None:
             draw_errorbar(ax, x, estimate, low, high)
             label_bar(ax, x, estimate, offset=2.8)
     ax.set_title("A. Which white-box readout works better?\nLayer 40, gen_5; exact secret")
-    ax.set_ylabel("Exact secret recovered (%)")
+    ax.set_ylabel("Exact-secret recall (%)")
     ax.set_xticks(centers, [label for _, label in metrics])
     ax.set_ylim(0, 100)
     ax.grid(axis="y", alpha=0.2, zorder=0)
@@ -203,7 +203,7 @@ def build_overview_bars() -> None:
         label_bar(ax, base_x, base[0], offset=1.5)
         label_bar(ax, adapter_x, adapter[0], offset=2.8)
     ax.set_title("B. Did the signal appear after the LoRA?\nLayer 40, response average; exact word")
-    ax.set_ylabel("Exact secret in top 5 (%)")
+    ax.set_ylabel("Exact-secret Recall@5 (%)")
     ax.set_xticks(centers, method_names)
     ax.set_ylim(0, 100)
     ax.grid(axis="y", alpha=0.2, zorder=0)
@@ -262,7 +262,7 @@ def build_layer_curve() -> None:
     ax.text(40.8, 96, "layer 40\nchosen on validation", va="top", fontsize=9)
     ax.set_title("Secret recovery changes sharply across layers", fontweight="bold")
     ax.set_xlabel("Model layer")
-    ax.set_ylabel("Exact secret in top 5 (%)")
+    ax.set_ylabel("Exact-secret Recall@5 (%)")
     ax.set_xlim(0, 62)
     ax.set_ylim(0, 100)
     ax.set_xticks([0, 8, 16, 24, 32, 40, 48, 56, 62])
@@ -335,7 +335,7 @@ def build_layer_position_heatmap() -> None:
         bbox={"boxstyle": "round,pad=0.25", "fc": "white", "ec": "#999999", "alpha": 0.9},
     )
     colorbar = fig.colorbar(image, ax=ax, pad=0.02)
-    colorbar.set_label("J-Lens − Logit Lens Hit@5 (percentage points)")
+    colorbar.set_label("J-Lens − Logit Lens Recall@5 (percentage points)")
     fig.text(
         0.5,
         0.01,
